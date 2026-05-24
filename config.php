@@ -5,6 +5,13 @@
  */
 
 // =============================================
+// LOCAL OVERRIDE — config.local.php có constants thực, tạo bởi install.php
+// =============================================
+if (file_exists(__DIR__ . '/config.local.php')) {
+    require_once __DIR__ . '/config.local.php';
+}
+
+// =============================================
 // DB CONNECTION
 // =============================================
 if (!defined('DB_HOST')) define('DB_HOST', '127.0.0.1');
