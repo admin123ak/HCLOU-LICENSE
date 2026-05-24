@@ -513,6 +513,7 @@ $logsToday   = (int)$db->query("SELECT COUNT(*) FROM connect_logs WHERE DATE(cre
     <td style="font-size:11px;color:#7a8499"><?= h($k['expired_at'] ?: '—') ?></td>
     <td style="font-size:11px"><?php if ($k['batch_id']): ?><a href="?action=export_batch&batch=<?= urlencode($k['batch_id']) ?>" style="color:#a78bfa;text-decoration:none">📥 <?= h(substr($k['batch_id'], -8)) ?></a><?php else: ?>—<?php endif ?></td>
     <td class="actions">
+      <a class="btn tiny primary" href="loader.php?id=<?= $k['id'] ?>" target="_blank" title="Download loader .lua">📥 Loader</a>
       <a class="btn tiny ghost" href="?tab=keys&edit=<?= $k['id'] ?>">Sửa</a>
       <?php if ($k['devices']): ?><form method="POST" style="display:inline" onsubmit="return confirm('Reset device binding?')"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="reset_binding"><input type="hidden" name="id" value="<?= $k['id'] ?>"><button class="btn tiny ghost" type="submit">Reset</button></form><?php endif ?>
       <form method="POST" style="display:inline" onsubmit="return confirm('Xoá key?')"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="delete_key"><input type="hidden" name="id" value="<?= $k['id'] ?>"><button class="btn tiny danger" type="submit">Xoá</button></form>

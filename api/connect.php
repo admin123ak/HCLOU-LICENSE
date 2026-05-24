@@ -20,6 +20,7 @@
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../lib/crypto.php';
+require_once __DIR__ . '/../lib/loader_builder.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -85,9 +86,12 @@ if (abs($now - $tsInt) > (int)NONCE_TTL) {
 }
 
 // =============================================
-// 3. HMAC VERIFY (chống tamper)
+// 3. HMAC VERIFY (chống tamper) — dùng derived secret per-key
 // =============================================
-if (!hmacVerify($game, $userKey, $serial, $nonce, $ts, $hmac)) {
+$perKeyHmac = deriveHmac($userKey);
+$payload = "{$game}|{$userKey}|{$serial}|{$nonce}|{$ts}";
+$expectedHmac = hash_hmac('sha256', $payload, $perKeyHmac);
+if (!hash_equals($expectedHmac, strtolower($hmac))) {
     logConnect(0, $serial, $ip, 'rejected', 'HMAC_INVALID');
     jsonResponse(['status' => false, 'reason' => 'HMAC_INVALID']);
 }
@@ -218,11 +222,15 @@ if (!$script) {
 
 // =============================================
 // 13. ENCRYPT BODY + BUILD RESPONSE
+// Per-key derived secrets cho token + XOR base
 // =============================================
-$bodyKey = deriveBodyKey($userKey, $serial);
+$perKeyXorBase = deriveXorBase($userKey);
+$bodyKeyMaterial = $userKey . '|' . $serial . '|' . $perKeyXorBase;
+$bodyKey = hash('sha256', $bodyKeyMaterial, true); // 32 bytes binary
 $bodyEnc = xorEncode((string)$script['body'], $bodyKey);
 
-$real  = "{$game}-{$userKey}-{$serial}-" . STATIC_WORD;
+$perKeyStatic = deriveStaticWord($userKey);
+$real  = "{$game}-{$userKey}-{$serial}-" . $perKeyStatic;
 $token = md5($real);
 
 logConnect($keyId, $serial, $ip, 'verify_ok', 'v=' . $script['version']);
