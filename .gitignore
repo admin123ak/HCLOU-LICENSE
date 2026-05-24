@@ -1,0 +1,22 @@
+# Local config override (đặt secrets thực ở đây, KHÔNG commit)
+config.local.php
+
+# Data files (logs, runtime state)
+data/*
+!data/.gitkeep
+
+# Backups
+*.bk
+*.bk[0-9]
+*.bk_*
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Composer (nếu sau có)
+vendor/
+composer.lock
