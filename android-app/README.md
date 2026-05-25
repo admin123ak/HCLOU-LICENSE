@@ -1,112 +1,48 @@
-# HCLOU Mod — Android NDK App
+# Introduction
+![GitHub](https://img.shields.io/github/license/LGLTeam/Android-Mod-Menu?style=flat-square)
 
-Source code Android Studio NDK project. Mở folder này trong Android Studio → build → ra APK.
+Floating mod menu for il2cpp and other native android games. KittyMemory, MSHook, And64InlineHook and basic string obfuscator (AY obfuscator) included. Assets are stored as base64 in cpp and does not need to be stored under assets folder.
 
-## Yêu cầu
+Support Android 4.4.x up to Android S Preview. ARMv7, x86 and ARM64 architecture supported.
 
-- **Android Studio Hedgehog 2023.1+** hoặc mới hơn
-- **Android NDK 25+** (auto cài qua SDK Manager)
-- **CMake 3.22.1+** (auto cài qua SDK Manager)
-- **JDK 17** (Android Studio ship sẵn)
+![](https://i.imgur.com/zeumkBG.gif)
 
-## Cấu trúc
+# Known bug
+- Spinner does not show on some devices running Android 11. Should work again on Android 12
+- On some games, menu is using old layout such as Kitkat or Gingerbread when launched without permission. We have not found a way to fix it.
 
-```
-android-app/
-├── app/
-│   ├── build.gradle              Gradle config + NDK abi + minify release
-│   ├── proguard-rules.pro        Giữ JNI native methods
-│   └── src/main/
-│       ├── AndroidManifest.xml   permissions: INTERNET, SYSTEM_ALERT_WINDOW
-│       ├── java/com/hclou/mod/
-│       │   ├── MainActivity.java login screen + JNI call
-│       │   └── ModService.java   floating menu service
-│       ├── cpp/
-│       │   ├── CMakeLists.txt    build native lib hcloumod.so
-│       │   ├── native-lib.cpp    JNI bridge + mod thread loop
-│       │   ├── hclou_connect.h   license API interface
-│       │   └── hclou_connect.cpp HMAC + MD5 + curl POST + token verify
-│       └── res/
-│           ├── layout/           activity_login + floating_menu
-│           ├── drawable/         bg_input + bg_btn + bg_float
-│           └── values/           strings + themes (lavender dark)
-├── build.gradle                  Top-level
-├── settings.gradle               Include :app
-├── gradle.properties             AndroidX + JVM args
-└── gradle/wrapper/               Gradle 8.7
-```
+# Download
+Download this repo as ZIP, or clone using any git tools
 
-## Setup curl + openssl trên Android NDK
+Or download Releases here https://github.com/LGLTeam/Android-Mod-Menu/releases
 
-Sample `CMakeLists.txt` hiện stub (chỉ link liblog). Để build thực tế, cần prebuilt curl + openssl cho Android:
+# Getting started
+**Go to this Wiki page to start reading:**
 
-**Option A — Dùng prebuilt repository:**
-```bash
-# Tải prebuilt từ https://github.com/leenjewel/openssl_for_ios_and_android
-# Hoặc https://github.com/robertying/openssl-build-scripts
-# Copy thư mục prebuilt/ vào app/src/main/cpp/
-```
+https://github.com/LGLTeam/Android-Mod-Menu/wiki
 
-**Option B — Build từ nguồn:**
-```bash
-# Build openssl 3.x cho Android NDK theo hướng dẫn:
-# https://wiki.openssl.org/index.php/Android
-# Tương tự curl với --with-openssl
-```
+# Help, Support, FAQ
 
-Sau khi có prebuilt, uncomment trong `CMakeLists.txt`:
-```cmake
-target_include_directories(hcloumod PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/openssl/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/curl/include
-)
-target_link_libraries(hcloumod
-    ${log-lib}
-    ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/curl/lib/${ANDROID_ABI}/libcurl.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/openssl/lib/${ANDROID_ABI}/libssl.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/openssl/lib/${ANDROID_ABI}/libcrypto.a
-    z
-)
-```
+See: [Frequently Asked Questions (FAQ)](https://github.com/LGLTeam/Android-Mod-Menu/wiki/FAQ) where common questions are answered.
 
-## Build APK
+If you have installation or usage problems, try asking your questions on the forum sites. For example, if you have an issue with Hooking and game crashes, you should go to the **support forums**. Here there are no teachers who can help you with such issues. Because of that, issues are disabled permanently due to peoples who have no mind (mostly newbies) aren't even able to fill proper issue templates nor are they able to read the instructions. I get so many useless issues, even useless pull-requests.
 
-```bash
-# Trong Android Studio:
-Build → Build Bundle(s)/APK(s) → Build APK(s)
+**There is no ETA (estimated time of arrival) when I will update, I will never provide ETA no matter what! So you better stop asking such question!**
 
-# Hoặc CLI:
-./gradlew assembleRelease
-# → app/build/outputs/apk/release/app-release.apk
-```
+# Credits
+Thanks to the following individuals whose code helped me develop this mod menu
 
-Sau khi build, sign APK bằng keystore của dev rồi giao user cài.
+* Octowolve/Escanor - Mod menu: https://github.com/z3r0Sec/Substrate-Template-With-Mod-Menu and Hooking: https://github.com/z3r0Sec/Substrate-Hooking-Example
+* VanHoevenTR - Mod menu - https://github.com/LGLTeam/VanHoevenTR_Android_Mod_Menu
+* MrIkso - First mod menu template https://github.com/MrIkso/FloatingModMenu
+* MJx0 A.K.A Ruit - https://github.com/MJx0/KittyMemory
+* Rprop - https://github.com/Rprop/And64InlineHook
+* And everyone else who provided input and contributions to this project!
 
-## Bảo mật trước khi release
+# License
+**GNU General Public License 3**
 
-1. **XOR encode secrets** trong `hclou_connect.cpp` line 25-26 (`HMAC_SECRET` + `STATIC_WORD`).
-2. **Strip symbols** sau build release:
-   ```bash
-   $ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip --strip-all \
-     app/build/intermediates/cmake/release/obj/arm64-v8a/libhcloumod.so
-   ```
-3. **ProGuard** đã bật `minifyEnabled true` cho release.
-4. **Anti-debug** thêm trong `native-lib.cpp::modThreadEntry()` check `/proc/self/status` TracerPid.
+# Disclaimer
+This project is for Educational Use only. We do not condone this project being used to gain an advantage against other people. This project was made for fun.
 
-## Flow user
-
-1. User cài APK.
-2. Mở app → màn hình login → nhập key `HCLOU-XXXXXXXXXXXX`.
-3. Bấm "Đăng nhập" → app gọi `jniLogin()` → `hclou::login()` → POST `/api/connect.php`.
-4. Server verify → trả `modname/credit/token` → token verify pass → modConfig populated.
-5. Màn hình hiện modname + credit + ngày hết hạn → button "Start Mod" enable.
-6. User bấm "Start Mod" → app xin quyền SYSTEM_ALERT_WINDOW → ModService start.
-7. Floating menu hiện trên màn hình game → user toggle Bypass → mod thread run.
-
-## TODO cho dev
-
-- [ ] Add prebuilt openssl + libcurl vào `app/src/main/cpp/prebuilt/`.
-- [ ] Implement mod logic thật trong `native-lib.cpp::modThreadEntry()` — Bypass400, AimBot, etc.
-- [ ] Process memory access: mở `/proc/<pid>/mem` (cần root) hoặc dùng `ptrace` (non-root limited).
-- [ ] XOR encode secrets trước release.
-- [ ] Sign APK với keystore production.
+We strongly refrain you from buying any source codes on Telegram even if the author can be trusted, there is always a risk getting scammed. We will not be responsible for that. This project is always FREE to use
