@@ -13,8 +13,14 @@
 #include "Includes/Logger.h"
 #include "Includes/obfuscate.h"
 #include "Includes/Utils.h"
+#include "KittyMemory/MemoryPatch.h"
 #include "KittyMemory/KittyMemory.h"
 #include "Menu/Setup.h"
+#include "duymmo/Call_Me.h"
+#include "Unity/MonoString.h"
+//Target lib here
+#define targetLibName OBFUSCATE("libFileA.so")
+
 #include "Includes/Macros.h"
 
 // ============================================================================
