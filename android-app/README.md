@@ -1,66 +1,48 @@
-# HCLOU FF Loader — Android NDK App
+# Introduction
+![GitHub](https://img.shields.io/github/license/LGLTeam/Android-Mod-Menu?style=flat-square)
 
-App loader root cho **Free Fire** (`com.dts.freefireth`).
-Login HCLOU-LICENSE + Floating menu Bypass Login 400.
+Floating mod menu for il2cpp and other native android games. KittyMemory, MSHook, And64InlineHook and basic string obfuscator (AY obfuscator) included. Assets are stored as base64 in cpp and does not need to be stored under assets folder.
 
-## Build
+Support Android 4.4.x up to Android S Preview. ARMv7, x86 and ARM64 architecture supported.
 
-1. Mở folder này trong Android Studio Hedgehog+
-2. SDK Manager cài: Android SDK 34, NDK 25+, CMake 3.22
-3. **Add prebuilt curl + openssl cho Android** (xem `app/src/main/cpp/CMakeLists.txt`):
-   - Download từ https://github.com/leenjewel/openssl_for_ios_and_android
-   - Copy vào `app/src/main/cpp/prebuilt/curl/` và `prebuilt/openssl/`
-   - Uncomment phần target_link_libraries trong CMakeLists.txt
-4. Build → Build APK(s)
-5. Sign APK + ship
+![](https://i.imgur.com/zeumkBG.gif)
 
-## Flow user
+# Known bug
+- Spinner does not show on some devices running Android 11. Should work again on Android 12
+- On some games, menu is using old layout such as Kitkat or Gingerbread when launched without permission. We have not found a way to fix it.
 
-1. Mở app → form login (UI lavender dark).
-2. Nhập key `HCLOU-XXXXXXXXXXXX` → bấm VÀO GAME.
-3. Native verify qua HCLOU-LICENSE (HMAC + per_static derive + token MD5).
-4. Login OK → hiện modname/credit/EXP → button START MOD enable.
-5. Bấm START MOD → xin quyền SYSTEM_ALERT_WINDOW → service start floating menu.
-6. App ẩn vào background, user mở Free Fire.
-7. Floating menu hiện trên màn hình FF → bấm "Bypass Login 400" toggle ON.
-8. Native lib tìm `libil2cpp.so` base trong `/proc/self/maps` (yêu cầu lib inject hoặc Substrate hook).
-9. Bypass400 thread loop ghi memory codes 0x0001007B / 0x0002007C vào offset cố định.
+# Download
+Download this repo as ZIP, or clone using any git tools
 
-## Architecture
+Or download Releases here https://github.com/LGLTeam/Android-Mod-Menu/releases
 
-```
-app/
-├── build.gradle              NDK arm64/armv7, C++17, ProGuard release
-└── src/main/
-    ├── AndroidManifest.xml   INTERNET + SYSTEM_ALERT_WINDOW + FOREGROUND_SERVICE
-    ├── java/com/hclou/ffloader/
-    │   ├── MainActivity.java login form + JNI verify
-    │   └── ModService.java   floating menu service drag-to-move
-    ├── cpp/
-    │   ├── CMakeLists.txt    build libhclouff.so (cần prebuilt curl + openssl)
-    │   ├── native-lib.cpp    HMAC + curl + Bypass400 thread + JNI bindings
-    │   └── Bypass_Login.h    code Bypass400 (in-process adapter inline)
-    └── res/                  layouts + drawables (lavender theme)
-```
+# Getting started
+**Go to this Wiki page to start reading:**
 
-## Bảo mật
+https://github.com/LGLTeam/Android-Mod-Menu/wiki
 
-`HCLOU_HMAC_SECRET` + `HCLOU_STATIC_WORD` đang plain text trong `native-lib.cpp` line 25-28. Trước release production:
+# Help, Support, FAQ
 
-1. XOR encode + decrypt runtime.
-2. Strip symbols: `llvm-strip --strip-all libhclouff.so`.
-3. Server rotate `config.local.php` mỗi 1-2 tuần + bump app versionCode + force update.
+See: [Frequently Asked Questions (FAQ)](https://github.com/LGLTeam/Android-Mod-Menu/wiki/FAQ) where common questions are answered.
 
-## Test với server
+If you have installation or usage problems, try asking your questions on the forum sites. For example, if you have an issue with Hooking and game crashes, you should go to the **support forums**. Here there are no teachers who can help you with such issues. Because of that, issues are disabled permanently due to peoples who have no mind (mostly newbies) aren't even able to fill proper issue templates nor are they able to read the instructions. I get so many useless issues, even useless pull-requests.
 
-```bash
-curl -X POST https://teamcrack.linkpc.net/api/connect.php \
-  -d "game=com.dts.freefireth" \
-  -d "user_key=HCLOU-XXXXXXXXXXXX" \
-  -d "serial=...40hex..." \
-  -d "nonce=...24chars..." \
-  -d "timestamp=$(date +%s)" \
-  -d "hmac=..."
-```
+**There is no ETA (estimated time of arrival) when I will update, I will never provide ETA no matter what! So you better stop asking such question!**
 
-Verify server response trước khi test app.
+# Credits
+Thanks to the following individuals whose code helped me develop this mod menu
+
+* Octowolve/Escanor - Mod menu: https://github.com/z3r0Sec/Substrate-Template-With-Mod-Menu and Hooking: https://github.com/z3r0Sec/Substrate-Hooking-Example
+* VanHoevenTR - Mod menu - https://github.com/LGLTeam/VanHoevenTR_Android_Mod_Menu
+* MrIkso - First mod menu template https://github.com/MrIkso/FloatingModMenu
+* MJx0 A.K.A Ruit - https://github.com/MJx0/KittyMemory
+* Rprop - https://github.com/Rprop/And64InlineHook
+* And everyone else who provided input and contributions to this project!
+
+# License
+**GNU General Public License 3**
+
+# Disclaimer
+This project is for Educational Use only. We do not condone this project being used to gain an advantage against other people. This project was made for fun.
+
+We strongly refrain you from buying any source codes on Telegram even if the author can be trusted, there is always a risk getting scammed. We will not be responsible for that. This project is always FREE to use
