@@ -233,7 +233,10 @@ local function gen_nonce()
     math.randomseed(os.time() + math.floor(os.clock() * 1000))
     local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     local out = {}
-    for i = 1, 24 do out[i] = chars:sub(math.random(1, #chars), math.random(1, #chars)) end
+    for i = 1, 24 do
+        local idx = math.random(1, #chars)
+        out[i] = chars:sub(idx, idx)
+    end
     return table.concat(out)
 end
 
