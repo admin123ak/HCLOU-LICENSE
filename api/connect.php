@@ -72,7 +72,20 @@ if (strlen($serial) < 8 || strlen($serial) > 80
     || strlen($nonce) < 8 || strlen($nonce) > 64
     || !ctype_digit($ts) || strlen($hmac) !== 64) {
     logConnect(0, $serial, $ip, 'rejected', 'MALFORMED_INPUT');
-    jsonResponse(['status' => false, 'reason' => 'MALFORMED_INPUT']);
+    jsonResponse([
+        'status' => false,
+        'reason' => 'MALFORMED_INPUT',
+        'debug' => [
+            'game_len'     => strlen($game),
+            'userKey_len'  => strlen($userKey),
+            'serial_len'   => strlen($serial),
+            'nonce_len'    => strlen($nonce),
+            'ts_isdigit'   => ctype_digit($ts) ? 'yes' : 'no',
+            'ts_value'     => substr($ts, 0, 20),
+            'hmac_len'     => strlen($hmac),
+            'hmac_sample'  => substr($hmac, 0, 12),
+        ],
+    ]);
 }
 
 // =============================================

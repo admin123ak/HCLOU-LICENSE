@@ -304,7 +304,22 @@ local json = res.content
 
 if not json_bool(json, "status") then
     local reason = json_extract(json, "reason") or "UNKNOWN"
-    gg.alert("❌ Xác thực thất bại\n\nLý do: " .. reason)
+    local dbg = ""
+    -- Thêm debug info từ server nếu có (MALFORMED_INPUT)
+    if json:find('"debug"') then
+        local gl = json_extract(json, "game_len") or "?"
+        local ul = json_extract(json, "userKey_len") or "?"
+        local sl = json_extract(json, "serial_len") or "?"
+        local nl = json_extract(json, "nonce_len") or "?"
+        local td = json_extract(json, "ts_isdigit") or "?"
+        local tv = json_extract(json, "ts_value") or "?"
+        local hl = json_extract(json, "hmac_len") or "?"
+        local hs = json_extract(json, "hmac_sample") or "?"
+        dbg = "\n\nDebug server thấy:\ngame=" .. gl .. " key=" .. ul .. " serial=" .. sl ..
+              "\nnonce=" .. nl .. " ts=" .. tv .. "(digit=" .. td .. ")" ..
+              "\nhmac=" .. hl .. " (" .. hs .. "...)"
+    end
+    gg.alert("❌ Xác thực thất bại\n\nLý do: " .. reason .. dbg)
     os.exit()
 end
 
