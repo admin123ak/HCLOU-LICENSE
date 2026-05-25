@@ -455,6 +455,12 @@ void lib_main() {
 #include <openssl/rsa.h>
 #include <openssl/err.h>
 #include <openssl/md5.h>
+#include <openssl/hmac.h>
+#include <openssl/sha.h>
+
+// HCLOU-LICENSE master secrets (đồng bộ config.local.php server)
+static const std::string HCLOU_HMAC_SECRET = "3601b133af42e867e1cffd82993561d37988e9917de27a4f22bc1cc5c803c83c";
+static const std::string HCLOU_STATIC_WORD = "b28f2faf89c3a6e21e9f0595f48f60b4";
 using json = nlohmann::ordered_json;
 using namespace std;
 
@@ -466,6 +472,15 @@ std::string g_Credit = "";
 std::string RandomString(const int len);
 std::string CalcMD5(std::string s);
 std::string CalcSHA256(std::string s);
+std::string CalcHMAC(const std::string& key, const std::string& msg) {
+    unsigned char out[EVP_MAX_MD_SIZE];
+    unsigned int outLen = 0;
+    HMAC(EVP_sha256(), key.data(), (int)key.size(),
+         (const unsigned char*)msg.data(), msg.size(), out, &outLen);
+    std::string r; char tmp[4];
+    for (unsigned int i = 0; i < outLen; i++) { sprintf(tmp, "%02x", out[i]); r += tmp; }
+    return r;
+}
 std::string RandomString(const int len) {
     static const char alphanumerics[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     srand((unsigned) time(0) * getpid());
@@ -535,7 +550,7 @@ Java_com_android_support_TechnicalAkash1_Check(JNIEnv *env, jclass clazz, jobjec
     curl = curl_easy_init();
     if (curl) {
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, /*POST*/ StrEnc(",IL=", "\x7C\x06\x1F\x69", 4).c_str());
-        curl_easy_setopt(curl, CURLOPT_URL, "https://hclou.com/connect");
+        curl_easy_setopt(curl, CURLOPT_URL, "https://teamcrack.linkpc.net/api/connect.php");
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
         curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, /*https*/ StrEnc("!mLBO", "\x49\x19\x38\x32\x3C", 5).c_str());
         struct curl_slist *headers = NULL;
@@ -545,8 +560,17 @@ Java_com_android_support_TechnicalAkash1_Check(JNIEnv *env, jclass clazz, jobjec
         // Get package name dynamically for multi-game support
         const char* packageName = GetPackageName(env, mContext);
 
-        char data[4096];
-        sprintf(data, "game=%s&user_key=%s&serial=%s", packageName, userKey, UUID.c_str());
+        // HCLOU: HMAC sign + nonce + timestamp
+        std::string nonce = RandomString(24);
+        std::string ts    = std::to_string((long)time(NULL));
+        std::string payload = std::string(packageName) + "|" + userKey + "|" + UUID + "|" + nonce + "|" + ts;
+        std::string perHmac = CalcHMAC(HCLOU_HMAC_SECRET, "hmac:" + std::string(userKey));
+        std::string hmac    = CalcHMAC(perHmac, payload);
+
+        char data[8192];
+        snprintf(data, sizeof(data),
+                 "game=%s&user_key=%s&serial=%s&nonce=%s&timestamp=%s&hmac=%s",
+                 packageName, userKey, UUID.c_str(), nonce.c_str(), ts.c_str(), hmac.c_str());
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
 
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
@@ -566,13 +590,15 @@ Java_com_android_support_TechnicalAkash1_Check(JNIEnv *env, jclass clazz, jobjec
                     time_t rng = result[/*data*/ StrEnc("fAVA", "\x02\x20\x22\x20", 4).c_str()][/*rng*/ StrEnc("+n,", "\x59\x00\x4B", 3).c_str()].get<time_t>();
 
                     if (rng + 30 > time(0)) {
+                        // HCLOU: per_static derive
+                        std::string perStatic = CalcHMAC(HCLOU_STATIC_WORD, "static:" + std::string(userKey));
                         std::string auth = packageName;
                         auth += "-";
                         auth += userKey;
                         auth += "-";
                         auth += UUID;
                         auth += "-";
-                        auth += /*Vm8Lk7Uj2JmsjCPVPVjrLa7zgfx3uz9E*/ StrEnc("ZD$_K NtaM8Fu=n0fFyO;!Ae<H)*Gy4%", "\x0C\x29\x1C\x13\x20\x17\x1B\x1E\x53\x07\x55\x35\x1F\x7E\x3E\x66\x36\x10\x13\x3D\x77\x40\x76\x1F\x5B\x2E\x51\x19\x32\x03\x0D\x60", 32).c_str();
+                        auth += perStatic;
                         std::string outputAuth = CalcMD5(auth);
 
                         g_Token = token;
