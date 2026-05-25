@@ -253,18 +253,19 @@ body{font-family:'Inter',-apple-system,'Segoe UI',sans-serif;background:#0d1117;
 main{padding:24px 22px;max-width:1280px;margin:0 auto}
 h1{font-size:22px;font-weight:800;margin-bottom:18px;color:#fff}
 h2{font-size:15px;font-weight:700;margin:18px 0 10px;color:#fff}
-.card{background:#161b27;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.card{background:#161b27;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 8px 24px rgba(0,0,0,.3);overflow-x:auto;-webkit-overflow-scrolling:touch}
 .toast{padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:13px;font-weight:500}
 .toast.ok{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:#6ee7b7}
 .toast.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
-table{width:100%;border-collapse:collapse;font-size:13px}
-table th{text-align:left;padding:10px 12px;background:#1e2535;font-weight:600;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto}
+table th{text-align:left;padding:10px 12px;background:#1e2535;font-weight:600;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05);font-size:11px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;word-break:break-word;max-width:320px}
+table td code{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 table tr:hover td{background:rgba(124,111,224,.03)}
 .field{margin-bottom:12px}
 .field label{display:block;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-.field input,.field select,.field textarea{width:100%;padding:10px 12px;background:#1e2535;border:1px solid rgba(255,255,255,.08);border-radius:8px;color:#e2e8f0;font-size:13px;font-family:inherit;outline:none}
-.field textarea{min-height:120px;font-family:'SF Mono','JetBrains Mono',monospace;font-size:12px;line-height:1.5}
+.field input,.field select,.field textarea{width:100%;max-width:100%;padding:10px 12px;background:#1e2535;border:1px solid rgba(255,255,255,.08);border-radius:8px;color:#e2e8f0;font-size:13px;font-family:inherit;outline:none}
+.field textarea{min-height:120px;max-height:60vh;font-family:'SF Mono','JetBrains Mono',monospace;font-size:12px;line-height:1.5;resize:vertical;word-break:break-all}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:rgba(124,111,224,.5);box-shadow:0 0 0 2px rgba(124,111,224,.15)}
 .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 .btn{display:inline-block;padding:8px 14px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;color:#fff;transition:opacity .15s,transform .1s}
