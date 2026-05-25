@@ -274,7 +274,13 @@ local serial = get_serial()
 local nonce  = gen_nonce()
 local ts     = tostring(os.time())
 local payload = PACKAGE_ID .. "|" .. user_key .. "|" .. serial .. "|" .. nonce .. "|" .. ts
-local hmac    = hmac_sha256(HMAC_SECRET, payload)
+
+-- Derive per-key secrets (match server: deriveHmac/Static/XorBase trong PHP)
+local per_hmac   = hmac_sha256(HMAC_SECRET,   "hmac:"   .. user_key)
+local per_static = hmac_sha256(STATIC_WORD,   "static:" .. user_key)
+local per_xor    = hmac_sha256(BODY_XOR_BASE, "xor:"    .. user_key)
+
+local hmac = hmac_sha256(per_hmac, payload)
 
 local body = "game="      .. urlencode(PACKAGE_ID)
           .. "&user_key=" .. urlencode(user_key)
@@ -314,8 +320,8 @@ if not enc_body or not token then
     os.exit()
 end
 
--- Verify token md5(game-key-serial-staticWord)
-local expected_token = md5_hex(PACKAGE_ID .. "-" .. user_key .. "-" .. serial .. "-" .. STATIC_WORD)
+-- Verify token md5(game-key-serial-per_static)
+local expected_token = md5_hex(PACKAGE_ID .. "-" .. user_key .. "-" .. serial .. "-" .. per_static)
 if expected_token ~= token then
     gg.alert("Token invalid — server bị fake?\nExpected: " .. expected_token:sub(1, 8) .. "...\nGot: " .. token:sub(1, 8) .. "...")
     os.exit()
@@ -327,8 +333,8 @@ if rng + 30 < os.time() then
     os.exit()
 end
 
--- Decrypt body XOR (key = sha256(user_key|serial|BODY_XOR_BASE) — 32 bytes binary)
-local body_key = sha256_bin(user_key .. "|" .. serial .. "|" .. BODY_XOR_BASE)
+-- Decrypt body XOR (key = sha256(user_key|serial|per_xor) — 32 bytes binary)
+local body_key = sha256_bin(user_key .. "|" .. serial .. "|" .. per_xor)
 local script_body = xor_stream(base64_decode(enc_body), body_key)
 
 if #script_body < 10 then

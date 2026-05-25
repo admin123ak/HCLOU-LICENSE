@@ -241,14 +241,15 @@ if (($_GET['action'] ?? '') === 'export_batch' && !empty($_GET['batch'])) {
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',-apple-system,'Segoe UI',sans-serif;background:#0d1117;color:#e2e8f0;min-height:100vh}
-.topbar{background:#161b27;border-bottom:1px solid rgba(255,255,255,.07);padding:14px 22px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
-.topbar .brand{font-size:16px;font-weight:800;background:linear-gradient(135deg,#7c6fe0,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.topbar .sep{color:#5a6478;margin:0 4px}
-.topbar a{color:#94a3b8;text-decoration:none;font-size:13px;font-weight:600;padding:6px 10px;border-radius:8px;transition:background .15s}
+.topbar{background:#161b27;border-bottom:1px solid rgba(255,255,255,.07);padding:12px 18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:10}
+.topbar .brand{font-size:15px;font-weight:800;background:linear-gradient(135deg,#7c6fe0,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
+.topbar .sep{color:#5a6478;margin:0 2px}
+.topbar a{color:#94a3b8;text-decoration:none;font-size:12.5px;font-weight:600;padding:6px 10px;border-radius:8px;transition:background .15s;white-space:nowrap}
 .topbar a:hover{background:rgba(124,111,224,.12);color:#e2e8f0}
 .topbar a.on{background:rgba(124,111,224,.18);color:#a78bfa}
-.topbar .right{margin-left:auto;font-size:12px;color:#5a6478}
+.topbar .right{margin-left:auto;font-size:12px;color:#5a6478;white-space:nowrap}
 .topbar .right a{color:#fca5a5;font-weight:600}
+@media(max-width:640px){.topbar{gap:4px}.topbar a{padding:5px 8px;font-size:12px}.topbar .sep{display:none}.topbar .right{margin-left:0;width:100%;text-align:right;margin-top:4px}}
 main{padding:24px 22px;max-width:1280px;margin:0 auto}
 h1{font-size:22px;font-weight:800;margin-bottom:18px;color:#fff}
 h2{font-size:15px;font-weight:700;margin:18px 0 10px;color:#fff}
@@ -376,6 +377,7 @@ $logsToday   = (int)$db->query("SELECT COUNT(*) FROM connect_logs WHERE DATE(cre
     <td><?= $g['k_count'] ?></td>
     <td><span class="badge <?= $g['is_active']?'green':'gray' ?>"><?= $g['is_active']?'ON':'OFF' ?></span></td>
     <td class="actions">
+      <a class="btn tiny primary" href="loader.php?game=<?= $g['id'] ?>" target="_blank" title="Download loader .lua chung cho game này">📥 Loader</a>
       <form method="POST" style="display:inline"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="toggle_game"><input type="hidden" name="id" value="<?= $g['id'] ?>"><button class="btn tiny ghost" type="submit"><?= $g['is_active']?'Tắt':'Bật' ?></button></form>
       <form method="POST" style="display:inline" onsubmit="return confirm('Xoá game này?')"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="delete_game"><input type="hidden" name="id" value="<?= $g['id'] ?>"><button class="btn tiny danger" type="submit">Xoá</button></form>
     </td>
@@ -513,7 +515,6 @@ $logsToday   = (int)$db->query("SELECT COUNT(*) FROM connect_logs WHERE DATE(cre
     <td style="font-size:11px;color:#7a8499"><?= h($k['expired_at'] ?: '—') ?></td>
     <td style="font-size:11px"><?php if ($k['batch_id']): ?><a href="?action=export_batch&batch=<?= urlencode($k['batch_id']) ?>" style="color:#a78bfa;text-decoration:none">📥 <?= h(substr($k['batch_id'], -8)) ?></a><?php else: ?>—<?php endif ?></td>
     <td class="actions">
-      <a class="btn tiny primary" href="loader.php?id=<?= $k['id'] ?>" target="_blank" title="Download loader .lua">📥 Loader</a>
       <a class="btn tiny ghost" href="?tab=keys&edit=<?= $k['id'] ?>">Sửa</a>
       <?php if ($k['devices']): ?><form method="POST" style="display:inline" onsubmit="return confirm('Reset device binding?')"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="reset_binding"><input type="hidden" name="id" value="<?= $k['id'] ?>"><button class="btn tiny ghost" type="submit">Reset</button></form><?php endif ?>
       <form method="POST" style="display:inline" onsubmit="return confirm('Xoá key?')"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="delete_key"><input type="hidden" name="id" value="<?= $k['id'] ?>"><button class="btn tiny danger" type="submit">Xoá</button></form>
