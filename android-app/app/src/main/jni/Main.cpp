@@ -1,6 +1,7 @@
 // ============================================================================
-// HCLOU Mod Loader — Main.cpp
-// Login HCLOU-LICENSE + Bypass Login 400 (anti-cheat IL2CPP)
+// HCLOU Mod Loader — Main.cpp (clean rewrite từ template gốc)
+// Login HCLOU-LICENSE + Bypass Login 400 (1 chức năng duy nhất)
+// Dùng cho máy ROOT (KittyMemory inject lib vào game process).
 // ============================================================================
 
 #include <list>
@@ -31,7 +32,6 @@
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
 
-// Bypass Login 400 — file của user + adapter
 #include "Bypass_Login_Adapter.h"
 #include "Bypass_Login.h"
 
@@ -39,47 +39,47 @@ using json = nlohmann::ordered_json;
 using namespace std;
 
 // ============================================================================
-// GLOBAL STATE
-// ============================================================================
-bool bValid = false;
-std::string g_Auth, g_Token;
-std::string g_ModName = "HCLOU MOD";
-std::string g_ModStatus = "UNKNOWN";
-std::string g_Credit = "";
-
-// Globals cho Bypass_Login.h
-pid_t       pid         = 0;
-uintptr_t   il2cppBase  = 0;
-ConfigState g_config;
-std::mutex  g_configMutex;
-
-// ============================================================================
-// HCLOU-LICENSE MASTER SECRETS — đồng bộ config.local.php server.
+// HCLOU-LICENSE MASTER SECRETS — đồng bộ với config.local.php trên server.
+// XOR / OBFUSCATE trước khi release production.
 // ============================================================================
 static const std::string HCLOU_HMAC_SECRET = "3601b133af42e867e1cffd82993561d37988e9917de27a4f22bc1cc5c803c83c";
 static const std::string HCLOU_STATIC_WORD = "b28f2faf89c3a6e21e9f0595f48f60b4";
 static const std::string HCLOU_API_URL     = "https://teamcrack.linkpc.net/api/connect.php";
 
 // ============================================================================
+// GLOBAL STATE
+// ============================================================================
+bool bValid = false;
+std::string g_Auth, g_Token;
+std::string g_ModName   = "HCLOU MOD";
+std::string g_ModStatus = "UNKNOWN";
+std::string g_Credit;
+
+// Globals cho Bypass_Login.h (defined trong Bypass_Login_Adapter.h)
+pid_t       pid        = 0;
+uintptr_t   il2cppBase = 0;
+ConfigState g_config;
+std::mutex  g_configMutex;
+
+// ============================================================================
 // CRYPTO HELPERS
 // ============================================================================
 std::string RandomString(const int len) {
-    static const char alphanumerics[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static const char chars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     srand((unsigned) time(0) * getpid());
     std::string tmp; tmp.reserve(len);
-    for (int i = 0; i < len; ++i) tmp += alphanumerics[rand() % (sizeof(alphanumerics) - 1)];
+    for (int i = 0; i < len; ++i) tmp += chars[rand() % (sizeof(chars) - 1)];
     return tmp;
 }
 
-std::string CalcMD5(std::string s) {
-    std::string result;
+std::string CalcMD5(const std::string& s) {
     unsigned char hash[MD5_DIGEST_LENGTH];
-    char tmp[4];
     MD5_CTX md5;
     MD5_Init(&md5);
     MD5_Update(&md5, s.c_str(), s.length());
     MD5_Final(hash, &md5);
-    for (unsigned char i : hash) { sprintf(tmp, "%02x", i); result += tmp; }
+    std::string result; char tmp[4];
+    for (unsigned char b : hash) { sprintf(tmp, "%02x", b); result += tmp; }
     return result;
 }
 
@@ -94,12 +94,10 @@ std::string CalcHMAC(const std::string& key, const std::string& msg) {
 }
 
 // ============================================================================
-// HACK THREAD — init il2cppBase + pid + start Bypass400 thread
+// HACK THREAD — wait libil2cpp + start Bypass400 thread
 // ============================================================================
 void *hack_thread(void *) {
     sleep(5);
-
-    // Đợi libil2cpp.so load
     ProcMap il2cppMap;
     do {
         il2cppMap = KittyMemory::getLibraryMap("libil2cpp.so");
@@ -107,13 +105,11 @@ void *hack_thread(void *) {
     } while (!il2cppMap.isValid());
 
     pid        = getpid();
-    il2cppBase = il2cppMap.startAddress;
+    il2cppBase = (uintptr_t)il2cppMap.startAddr;
 
-    // Khởi Bypass400 thread (file Bypass_Login.h)
     pthread_t bypassThread;
     pthread_create(&bypassThread, NULL, Bypass400, NULL);
     pthread_detach(bypassThread);
-
     return NULL;
 }
 
@@ -124,47 +120,47 @@ void lib_main() {
 }
 
 // ============================================================================
-// MENU FEATURES — chỉ 1 toggle "Bypass Login 400"
+// MENU — chỉ 1 toggle "Bypass Login 400"
 // ============================================================================
 jobjectArray GetFeatureList(JNIEnv *env, jobject context) {
-    jobjectArray ret;
     const char *features[] = {
         OBFUSCATE("Category_HCLOU MOD"),
         OBFUSCATE("100_Toggle_Bypass Login 400"),
     };
-    int Total_Feature = (sizeof features / sizeof features[0]);
-    ret = (jobjectArray) env->NewObjectArray(Total_Feature, env->FindClass(OBFUSCATE("java/lang/String")), env->NewStringUTF(""));
-    for (int i = 0; i < Total_Feature; i++)
-        env->SetObjectArrayElement(ret, i, env->NewStringUTF(features[i]));
+    int total = sizeof(features) / sizeof(features[0]);
+    jobjectArray ret = (jobjectArray) env->NewObjectArray(total, env->FindClass(OBFUSCATE("java/lang/String")), env->NewStringUTF(""));
+    for (int i = 0; i < total; i++) env->SetObjectArrayElement(ret, i, env->NewStringUTF(features[i]));
     return ret;
 }
 
 void Changes(JNIEnv *env, jclass clazz, jobject obj,
              jint featNum, jstring featName, jint value,
              jboolean boolean, jstring str) {
-    LOGD(OBFUSCATE("Feature %d | bool=%d"), featNum, boolean);
-    switch (featNum) {
-        case 100: {
-            std::lock_guard<std::mutex> lock(g_configMutex);
-            g_config.bypass400 = boolean;
-            break;
-        }
+    if (featNum == 100) {
+        std::lock_guard<std::mutex> lock(g_configMutex);
+        g_config.bypass400 = boolean;
     }
 }
 
 // ============================================================================
-// LICENSE CHECK — HCLOU-LICENSE backend với HMAC + per_static derive
+// LICENSE CHECK — HCLOU-LICENSE backend
+// Server formula (PHP):
+//   perHmac   = hmac_sha256(HMAC_SECRET,   "hmac:"   + userKey)
+//   perStatic = hmac_sha256(STATIC_WORD,   "static:" + userKey)
+//   payload   = "{game}|{userKey}|{serial}|{nonce}|{timestamp}"
+//   expected  = hmac_sha256(perHmac, payload)
+//   token     = md5("{game}-{userKey}-{serial}-{perStatic}")
 // ============================================================================
-struct LicenseMemoryStruct { char *memory; size_t size; };
+struct LicenseChunk { char *memory; size_t size; };
 
 static size_t LicenseWriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realsize = size * nmemb;
-    auto *mem = (LicenseMemoryStruct*) userp;
-    mem->memory = (char*)realloc(mem->memory, mem->size + realsize + 1);
-    if (!mem->memory) return 0;
-    memcpy(&(mem->memory[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->memory[mem->size] = 0;
+    auto *m = (LicenseChunk*) userp;
+    m->memory = (char*) realloc(m->memory, m->size + realsize + 1);
+    if (!m->memory) return 0;
+    memcpy(&(m->memory[m->size]), contents, realsize);
+    m->size += realsize;
+    m->memory[m->size] = 0;
     return realsize;
 }
 
@@ -172,22 +168,23 @@ extern "C" {
 
 JNIEXPORT jstring JNICALL
 Java_com_android_support_TechnicalAkash1_Check(JNIEnv *env, jclass clazz, jobject mContext, jstring mUserKey) {
-    auto userKey = env->GetStringUTFChars(mUserKey, 0);
+    const char *userKey = env->GetStringUTFChars(mUserKey, 0);
 
-    std::string hwid = userKey;
-    hwid += GetAndroidID(env, mContext);
-    hwid += GetDeviceModel(env);
-    hwid += GetDeviceBrand(env);
+    std::string hwid = std::string(userKey)
+                     + GetAndroidID(env, mContext)
+                     + GetDeviceModel(env)
+                     + GetDeviceBrand(env);
     std::string UUID = GetDeviceUniqueIdentifier(env, hwid.c_str());
 
     std::string errMsg;
-    LicenseMemoryStruct chunk{};
-    chunk.memory = (char*) malloc(1); chunk.size = 0;
+    LicenseChunk chunk{};
+    chunk.memory = (char*) malloc(1);
+    chunk.size   = 0;
 
     CURL *curl = curl_easy_init();
     if (curl) {
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_easy_setopt(curl, CURLOPT_URL, HCLOU_API_URL.c_str());
+        curl_easy_setopt(curl, CURLOPT_URL,           HCLOU_API_URL.c_str());
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
         struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
@@ -207,11 +204,11 @@ Java_com_android_support_TechnicalAkash1_Check(JNIEnv *env, jclass clazz, jobjec
                  packageName, userKey, UUID.c_str(), nonce.c_str(), ts.c_str(), hmac.c_str());
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
 
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, LicenseWriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*) &chunk);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,  LicenseWriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA,      (void*) &chunk);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT,        15L);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
 
         CURLcode res = curl_easy_perform(curl);
@@ -226,7 +223,6 @@ Java_com_android_support_TechnicalAkash1_Check(JNIEnv *env, jclass clazz, jobjec
                         std::string perStatic = CalcHMAC(HCLOU_STATIC_WORD, "static:" + std::string(userKey));
                         std::string auth = std::string(packageName) + "-" + userKey + "-" + UUID + "-" + perStatic;
                         std::string outputAuth = CalcMD5(auth);
-
                         g_Token = token; g_Auth = outputAuth;
                         bValid = (g_Token == g_Auth);
 
