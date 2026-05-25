@@ -32,9 +32,9 @@ if (!defined('APP_TIMEZONE'))  define('APP_TIMEZONE', 'Asia/Ho_Chi_Minh');
 // =============================================
 // Static word cho client tự verify response token md5(game-key-serial-staticWord).
 // LEAK = mất toàn bộ verify chain. KHÔNG commit secret thực tế vào git.
-if (!defined('STATIC_WORD'))      define('STATIC_WORD', 'CHANGE_ME_RANDOM_32_CHARS_HERE');
+if (!defined('STATIC_WORD'))      define('STATIC_WORD', 'afcfa84584f1e19e83e18d071bdcc9fa');
 // HMAC secret cho request sign (anti-tamper + anti-replay).
-if (!defined('HMAC_SECRET'))      define('HMAC_SECRET', 'CHANGE_ME_RANDOM_64_CHARS_HERE');
+if (!defined('HMAC_SECRET'))      define('HMAC_SECRET', 'd26213bb049ed2eaa539715db9b7a55aba89138302f2f39d2dee6b69de6eb00c');
 // Body XOR key derive base (combined với user_key + device_fp).
 if (!defined('BODY_XOR_BASE'))    define('BODY_XOR_BASE', 'CHANGE_ME_BASE_KEY');
 

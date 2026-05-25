@@ -14,6 +14,18 @@ function hmacVerify(string $game, string $userKey, string $serial, string $nonce
 }
 
 /**
+ * Per-key derive — phải KHỚP với app C++ (Main.cpp:201,226).
+ *   perHmac   = hmac_sha256(HMAC_SECRET, "hmac:"   + user_key)
+ *   perStatic = hmac_sha256(STATIC_WORD, "static:" + user_key)
+ */
+function deriveHmac(string $userKey): string {
+    return hash_hmac('sha256', 'hmac:' . $userKey, HMAC_SECRET);
+}
+function deriveStaticWord(string $userKey): string {
+    return hash_hmac('sha256', 'static:' . $userKey, STATIC_WORD);
+}
+
+/**
  * Derive XOR key cho body: hash(user_key + serial + BODY_XOR_BASE).
  * Mỗi (user_key, serial) cặp khác nhau → key khác → 2 user share body không decrypt được.
  */
