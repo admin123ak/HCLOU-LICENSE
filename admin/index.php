@@ -250,19 +250,17 @@ body{font-family:'Inter',-apple-system,'Segoe UI',sans-serif;background:#0d1117;
 .topbar .right{margin-left:auto;font-size:12px;color:#5a6478;white-space:nowrap}
 .topbar .right a{color:#fca5a5;font-weight:600}
 @media(max-width:640px){.topbar{gap:4px}.topbar a{padding:5px 8px;font-size:12px}.topbar .sep{display:none}.topbar .right{margin-left:0;width:100%;text-align:right;margin-top:4px}}
-main{padding:20px 16px;max-width:1280px;margin:0 auto;width:100%;overflow-x:hidden}
+main{padding:20px 16px;max-width:1280px;margin:0 auto;width:100%}
 h1{font-size:22px;font-weight:800;margin-bottom:18px;color:#fff}
 h2{font-size:15px;font-weight:700;margin:18px 0 10px;color:#fff}
-.card{background:#161b27;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:18px;margin-bottom:18px;box-shadow:0 8px 24px rgba(0,0,0,.3);overflow:hidden}
-.card-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+.card{background:#161b27;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:18px;margin-bottom:18px;box-shadow:0 8px 24px rgba(0,0,0,.3);overflow-x:auto;-webkit-overflow-scrolling:touch}
 .toast{padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:13px;font-weight:500}
 .toast.ok{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:#6ee7b7}
 .toast.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto;display:table}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto}
 table th{text-align:left;padding:10px 12px;background:#1e2535;font-weight:600;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05);font-size:11px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;word-break:break-word;overflow-wrap:anywhere;max-width:280px}
-table td code{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;white-space:nowrap}
-.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;margin:0 -18px;padding:0 18px}
+table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;word-break:break-word;overflow-wrap:anywhere}
+table td code{display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;white-space:nowrap}
 table tr:hover td{background:rgba(124,111,224,.03)}
 .field{margin-bottom:12px}
 .field label{display:block;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
