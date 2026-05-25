@@ -35,6 +35,8 @@ struct {
     bool Active = false;
 } WideView;
 bool HackMap,Cd,Ult,Lsd,Ten,Avatar,Fps,AimSkill,aimSkill1,aimSkill2,aimSkill3,AutoTrung;
+bool g_bypass400 = false;
+bool g_antiReport = false;
 int skillSlot;
 int Radius = 25000;
 void *instanceBtn;
@@ -353,8 +355,8 @@ jobjectArray GetFeatureList(JNIEnv *env, jobject context) {
             OBFUSCATE("ButtonLink_KEY FREE_https://t.me/QMODZzZ "),
             OBFUSCATE("ButtonLink_MUA KEY THÁNG_t.me/QMODZz "),
             OBFUSCATE("Category_Menu Bypass"),
-            OBFUSCATE("Toggle_Bypass Anti-Cheat ( Sảnh )"),
-            OBFUSCATE("Toggle_Anti Report ( Beta )"),
+            OBFUSCATE("100_Toggle_Bypass Login 400"),
+            OBFUSCATE("101_Toggle_Anti Report ( Beta )"),
             OBFUSCATE("Category_Main Menu"),
             OBFUSCATE("1_Toggle_Hack map"),
             OBFUSCATE("2_SeekBar_Cam xa_0_20"),
@@ -435,6 +437,12 @@ void Changes(JNIEnv *env, jclass clazz, jobject obj,
               break;
          case 13:
               AutoTrung = boolean;
+              break;
+         case 100:
+              g_bypass400 = boolean;
+              break;
+         case 101:
+              g_antiReport = boolean;
               break;
     }
 }
