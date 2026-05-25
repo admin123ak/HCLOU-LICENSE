@@ -22,13 +22,16 @@ CREATE TABLE IF NOT EXISTS `games` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
--- TABLE: scripts — Lua body lưu trữ per game, version
+-- TABLE: scripts — Mod config per game (modname/mod_status/credit cho C++ client)
 -- =============================================
 CREATE TABLE IF NOT EXISTS `scripts` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `game_id` INT(11) NOT NULL,
   `version` VARCHAR(20) NOT NULL DEFAULT '1.0.0',
-  `body` LONGTEXT NOT NULL,
+  `modname` VARCHAR(120) NOT NULL DEFAULT '',
+  `mod_status` ENUM('on','off') NOT NULL DEFAULT 'on',
+  `credit` TEXT DEFAULT NULL,
+  `body` LONGTEXT DEFAULT NULL,
   `is_active` TINYINT(1) DEFAULT 1,
   `notes` TEXT DEFAULT NULL,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -125,25 +125,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $msg = 'Đã xoá game';
         }
 
-        // ----- SCRIPTS -----
+        // ----- SCRIPTS (Mod Configs cho C++ client) -----
         if ($act === 'add_script') {
-            $db->prepare("INSERT INTO scripts (game_id, version, body, notes) VALUES (?, ?, ?, ?)")
-               ->execute([(int)$_POST['game_id'], trim($_POST['version']), $_POST['body'], trim($_POST['notes'] ?? '')]);
-            $msg = 'Đã thêm script';
+            $db->prepare("INSERT INTO scripts (game_id, version, modname, mod_status, credit, notes) VALUES (?, ?, ?, ?, ?, ?)")
+               ->execute([(int)$_POST['game_id'], trim($_POST['version']), trim($_POST['modname']), $_POST['mod_status'], trim($_POST['credit'] ?? ''), trim($_POST['notes'] ?? '')]);
+            $msg = 'Đã thêm mod config';
         }
         if ($act === 'edit_script') {
-            $db->prepare("UPDATE scripts SET version = ?, body = ?, notes = ? WHERE id = ?")
-               ->execute([trim($_POST['version']), $_POST['body'], trim($_POST['notes'] ?? ''), (int)$_POST['id']]);
-            $msg = 'Đã cập nhật script';
+            $db->prepare("UPDATE scripts SET version = ?, modname = ?, mod_status = ?, credit = ?, notes = ? WHERE id = ?")
+               ->execute([trim($_POST['version']), trim($_POST['modname']), $_POST['mod_status'], trim($_POST['credit'] ?? ''), trim($_POST['notes'] ?? ''), (int)$_POST['id']]);
+            $msg = 'Đã cập nhật mod config';
         }
         if ($act === 'toggle_script') {
             $db->prepare("UPDATE scripts SET is_active = 1 - is_active WHERE id = ?")
                ->execute([(int)$_POST['id']]);
-            $msg = 'Đã đổi trạng thái script';
+            $msg = 'Đã đổi trạng thái mod config';
         }
         if ($act === 'delete_script') {
             $db->prepare("DELETE FROM scripts WHERE id = ?")->execute([(int)$_POST['id']]);
-            $msg = 'Đã xoá script';
+            $msg = 'Đã xoá mod config';
         }
 
         // ----- KEYS -----
@@ -299,7 +299,7 @@ code{background:rgba(124,111,224,.1);padding:2px 6px;border-radius:4px;color:#a7
   <span class="sep">·</span>
   <a href="?tab=dashboard" class="<?= $tab==='dashboard'?'on':'' ?>">Dashboard</a>
   <a href="?tab=games" class="<?= $tab==='games'?'on':'' ?>">Games</a>
-  <a href="?tab=scripts" class="<?= $tab==='scripts'?'on':'' ?>">Scripts</a>
+  <a href="?tab=scripts" class="<?= $tab==='scripts'?'on':'' ?>">Mod Configs</a>
   <a href="?tab=keys" class="<?= $tab==='keys'?'on':'' ?>">Keys</a>
   <a href="?tab=bindings" class="<?= $tab==='bindings'?'on':'' ?>">Bindings</a>
   <a href="?tab=logs" class="<?= $tab==='logs'?'on':'' ?>">Logs</a>
@@ -379,7 +379,6 @@ $logsToday   = (int)$db->query("SELECT COUNT(*) FROM connect_logs WHERE DATE(cre
     <td><?= $g['k_count'] ?></td>
     <td><span class="badge <?= $g['is_active']?'green':'gray' ?>"><?= $g['is_active']?'ON':'OFF' ?></span></td>
     <td class="actions">
-      <a class="btn tiny primary" href="loader.php?game=<?= $g['id'] ?>" target="_blank" title="Download loader .lua chung cho game này">📥 Loader</a>
       <form method="POST" style="display:inline"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="toggle_game"><input type="hidden" name="id" value="<?= $g['id'] ?>"><button class="btn tiny ghost" type="submit"><?= $g['is_active']?'Tắt':'Bật' ?></button></form>
       <form method="POST" style="display:inline" onsubmit="return confirm('Xoá game này?')"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="delete_game"><input type="hidden" name="id" value="<?= $g['id'] ?>"><button class="btn tiny danger" type="submit">Xoá</button></form>
     </td>
@@ -390,7 +389,7 @@ $logsToday   = (int)$db->query("SELECT COUNT(*) FROM connect_logs WHERE DATE(cre
 </div>
 
 <?php elseif ($tab === 'scripts'): ?>
-<h1>Scripts (Lua body per game)</h1>
+<h1>Mod Configs (modname / mod_status / credit per game cho C++ client)</h1>
 <?php $games = $db->query("SELECT * FROM games WHERE is_active=1 ORDER BY id DESC")->fetchAll(); ?>
 
 <?php if (!empty($_GET['edit'])):
@@ -398,14 +397,16 @@ $logsToday   = (int)$db->query("SELECT COUNT(*) FROM connect_logs WHERE DATE(cre
     $s = $db->prepare("SELECT * FROM scripts WHERE id=?"); $s->execute([$sid]); $script = $s->fetch();
     if ($script): ?>
 <div class="card">
-  <h2>Sửa script #<?= $sid ?></h2>
+  <h2>Sửa mod config #<?= $sid ?></h2>
   <form method="POST">
     <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="edit_script"><input type="hidden" name="id" value="<?= $sid ?>">
     <div class="row">
       <div class="field"><label>Version</label><input name="version" required value="<?= h($script['version']) ?>"></div>
-      <div class="field"><label>Notes</label><input name="notes" value="<?= h($script['notes']) ?>"></div>
+      <div class="field"><label>Modname (hiện trên menu)</label><input name="modname" required value="<?= h($script['modname']) ?>"></div>
+      <div class="field"><label>Mod Status</label><select name="mod_status"><option value="on" <?= $script['mod_status']==='on'?'selected':'' ?>>on</option><option value="off" <?= $script['mod_status']==='off'?'selected':'' ?>>off</option></select></div>
     </div>
-    <div class="field"><label>Body Lua</label><textarea name="body" required><?= h($script['body']) ?></textarea></div>
+    <div class="field"><label>Credit (text hiện trong menu)</label><textarea name="credit" style="min-height:60px"><?= h($script['credit'] ?? '') ?></textarea></div>
+    <div class="field"><label>Notes</label><input name="notes" value="<?= h($script['notes']) ?>"></div>
     <button class="btn primary" type="submit">Lưu</button>
     <a class="btn ghost" href="?tab=scripts">Huỷ</a>
   </form>
@@ -413,7 +414,7 @@ $logsToday   = (int)$db->query("SELECT COUNT(*) FROM connect_logs WHERE DATE(cre
 <?php endif; endif ?>
 
 <div class="card">
-  <h2>Thêm script mới</h2>
+  <h2>Thêm mod config mới</h2>
   <?php if (!$games): ?><p style="color:#fca5a5;font-size:13px">⚠ Chưa có game. <a href="?tab=games" style="color:#a78bfa">Thêm game trước</a>.</p>
   <?php else: ?>
   <form method="POST">
@@ -421,10 +422,12 @@ $logsToday   = (int)$db->query("SELECT COUNT(*) FROM connect_logs WHERE DATE(cre
     <div class="row">
       <div class="field"><label>Game</label><select name="game_id" required><?php foreach ($games as $g): ?><option value="<?= $g['id'] ?>"><?= h($g['name']) ?></option><?php endforeach ?></select></div>
       <div class="field"><label>Version</label><input name="version" required value="1.0.0"></div>
-      <div class="field"><label>Notes</label><input name="notes" placeholder="Mô tả ngắn"></div>
+      <div class="field"><label>Modname</label><input name="modname" required placeholder="VD: NGO TRAN MODS"></div>
+      <div class="field"><label>Mod Status</label><select name="mod_status"><option value="on">on</option><option value="off">off</option></select></div>
     </div>
-    <div class="field"><label>Body Lua (paste toàn bộ script)</label><textarea name="body" required placeholder="-- Lua script body sẽ được trả về client sau khi key verify."></textarea></div>
-    <button class="btn primary" type="submit">+ Thêm script</button>
+    <div class="field"><label>Credit (hiện text trong menu)</label><textarea name="credit" style="min-height:60px" placeholder="VD: Powered by HCLOU"></textarea></div>
+    <div class="field"><label>Notes</label><input name="notes" placeholder="Ghi chú nội bộ"></div>
+    <button class="btn primary" type="submit">+ Thêm</button>
   </form>
   <?php endif ?>
 </div>
@@ -432,22 +435,23 @@ $logsToday   = (int)$db->query("SELECT COUNT(*) FROM connect_logs WHERE DATE(cre
 <div class="card">
   <h2>Danh sách</h2>
   <?php $scripts = $db->query("SELECT s.*, g.name game_name FROM scripts s JOIN games g ON s.game_id=g.id ORDER BY s.id DESC")->fetchAll(); ?>
-  <?php if (!$scripts): ?><p style="color:#5a6478;font-size:13px">Chưa có script.</p>
+  <?php if (!$scripts): ?><p style="color:#5a6478;font-size:13px">Chưa có mod config.</p>
   <?php else: ?>
-  <table><tr><th>ID</th><th>Game</th><th>Version</th><th>Size</th><th>Notes</th><th>Updated</th><th>TT</th><th>Action</th></tr>
+  <table><tr><th>ID</th><th>Game</th><th>Modname</th><th>Status</th><th>Ver</th><th>Credit</th><th>Updated</th><th>TT</th><th>Action</th></tr>
   <?php foreach ($scripts as $s): ?>
   <tr>
     <td>#<?= $s['id'] ?></td>
     <td><?= h($s['game_name']) ?></td>
+    <td><code><?= h($s['modname']) ?></code></td>
+    <td><span class="badge <?= $s['mod_status']==='on'?'green':'gray' ?>"><?= $s['mod_status'] ?></span></td>
     <td><code><?= h($s['version']) ?></code></td>
-    <td><?= number_format(strlen($s['body'])) ?> B</td>
-    <td style="font-size:12px;color:#7a8499"><?= h(mb_strimwidth($s['notes'] ?? '', 0, 40, '…')) ?></td>
+    <td style="font-size:12px;color:#7a8499"><?= h(mb_strimwidth($s['credit'] ?? '', 0, 40, '…')) ?></td>
     <td style="font-size:11px;color:#7a8499"><?= h($s['updated_at']) ?></td>
     <td><span class="badge <?= $s['is_active']?'green':'gray' ?>"><?= $s['is_active']?'ON':'OFF' ?></span></td>
     <td class="actions">
       <a class="btn tiny ghost" href="?tab=scripts&edit=<?= $s['id'] ?>">Sửa</a>
       <form method="POST" style="display:inline"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="toggle_script"><input type="hidden" name="id" value="<?= $s['id'] ?>"><button class="btn tiny ghost" type="submit"><?= $s['is_active']?'Tắt':'Bật' ?></button></form>
-      <form method="POST" style="display:inline" onsubmit="return confirm('Xoá script này?')"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="delete_script"><input type="hidden" name="id" value="<?= $s['id'] ?>"><button class="btn tiny danger" type="submit">Xoá</button></form>
+      <form method="POST" style="display:inline" onsubmit="return confirm('Xoá mod config?')"><input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="action" value="delete_script"><input type="hidden" name="id" value="<?= $s['id'] ?>"><button class="btn tiny danger" type="submit">Xoá</button></form>
     </td>
   </tr>
   <?php endforeach ?>

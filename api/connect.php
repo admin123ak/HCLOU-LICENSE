@@ -223,39 +223,36 @@ if (!in_array($serial, $devices, true)) {
 }
 
 // =============================================
-// 12. GET LATEST ACTIVE SCRIPT for this game
+// 12. GET LATEST ACTIVE MOD CONFIG for this game
 // =============================================
 $s = $db->prepare("SELECT * FROM scripts WHERE game_id = ? AND is_active = 1 ORDER BY id DESC LIMIT 1");
 $s->execute([(int)$gameRow['id']]);
-$script = $s->fetch();
-if (!$script) {
-    logConnect($keyId, $serial, $ip, 'rejected', 'NO_SCRIPT_AVAILABLE');
-    jsonResponse(['status' => false, 'reason' => 'NO_SCRIPT_AVAILABLE']);
+$mod = $s->fetch();
+if (!$mod) {
+    logConnect($keyId, $serial, $ip, 'rejected', 'NO_MOD_CONFIG');
+    jsonResponse(['status' => false, 'reason' => 'NO_MOD_CONFIG']);
 }
 
 // =============================================
-// 13. ENCRYPT BODY + BUILD RESPONSE
-// Per-key derived secrets cho token + XOR base
+// 13. BUILD RESPONSE — C++ mod menu format
+// (token = md5(game-key-serial-per_static) cho client tự verify)
 // =============================================
-$perKeyXorBase = deriveXorBase($userKey);
-$bodyKeyMaterial = $userKey . '|' . $serial . '|' . $perKeyXorBase;
-$bodyKey = hash('sha256', $bodyKeyMaterial, true); // 32 bytes binary
-$bodyEnc = xorEncode((string)$script['body'], $bodyKey);
-
 $perKeyStatic = deriveStaticWord($userKey);
 $real  = "{$game}-{$userKey}-{$serial}-" . $perKeyStatic;
 $token = md5($real);
 
-logConnect($keyId, $serial, $ip, 'verify_ok', 'v=' . $script['version']);
+logConnect($keyId, $serial, $ip, 'verify_ok', 'v=' . $mod['version']);
 
 jsonResponse([
     'status' => true,
     'data' => [
-        'script_body' => $bodyEnc,
-        'version'     => (string)$script['version'],
+        'modname'     => (string)$mod['modname'],
+        'mod_status'  => (string)$mod['mod_status'],
+        'credit'      => (string)($mod['credit'] ?? ''),
+        'version'     => (string)$mod['version'],
         'token'       => $token,
         'EXP'         => $expireAt,
-        'max_devices' => $maxDev,
+        'device'      => $maxDev,
         'rng'         => $now,
     ],
 ]);
