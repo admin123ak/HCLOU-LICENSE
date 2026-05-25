@@ -292,7 +292,6 @@ code{background:rgba(124,111,224,.1);padding:2px 6px;border-radius:4px;color:#a7
 .stat .val.purple{color:#a78bfa}
 .stat .val.green{color:#34d399}
 .stat .val.orange{color:#fdba74}
-.actions{display:flex;gap:6px;flex-wrap:wrap}
 </style>
 </head>
 <body>
