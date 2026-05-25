@@ -1,6 +1,6 @@
 // ============================================================================
 // HCLOU Mod Loader — Main.cpp
-// Login HCLOU-LICENSE + Bypass Login 400 only (anti-cheat IL2CPP)
+// Login HCLOU-LICENSE + Bypass Login 400 (anti-cheat IL2CPP)
 // ============================================================================
 
 #include <list>
@@ -31,6 +31,10 @@
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
 
+// Bypass Login 400 — file của user + adapter
+#include "Bypass_Login_Adapter.h"
+#include "Bypass_Login.h"
+
 using json = nlohmann::ordered_json;
 using namespace std;
 
@@ -43,12 +47,14 @@ std::string g_ModName = "HCLOU MOD";
 std::string g_ModStatus = "UNKNOWN";
 std::string g_Credit = "";
 
-// Bypass Login 400 toggle (menu item ID 100)
-bool g_bypass400 = false;
+// Globals cho Bypass_Login.h
+pid_t       pid         = 0;
+uintptr_t   il2cppBase  = 0;
+ConfigState g_config;
+std::mutex  g_configMutex;
 
 // ============================================================================
 // HCLOU-LICENSE MASTER SECRETS — đồng bộ config.local.php server.
-// Bọc OBFUSCATE/StrEnc trước release để không lộ plain trong .so.
 // ============================================================================
 static const std::string HCLOU_HMAC_SECRET = "d26213bb049ed2eaa539715db9b7a55aba89138302f2f39d2dee6b69de6eb00c";
 static const std::string HCLOU_STATIC_WORD = "afcfa84584f1e19e83e18d071bdcc9fa";
@@ -88,78 +94,26 @@ std::string CalcHMAC(const std::string& key, const std::string& msg) {
 }
 
 // ============================================================================
-// BYPASS LOGIN 400 — IL2CPP memory write (in-process, runs in game's lib)
-// Logic resolve static fields holder → write state codes vào target struct.
+// HACK THREAD — init il2cppBase + pid + start Bypass400 thread
 // ============================================================================
-static inline bool BPReadPtr(uintptr_t address, uintptr_t& out) {
-    out = 0;
-    if (address == 0) return false;
-    out = *reinterpret_cast<uintptr_t*>(address);
-    return true;
-}
+void *hack_thread(void *) {
+    sleep(5);
 
-static uintptr_t BPResolveTaggedMetadata(uintptr_t slotAddress) {
-    uintptr_t tagged = 0;
-    if (!BPReadPtr(slotAddress, tagged) || tagged == 0) return 0;
-    if ((tagged & 1ULL) != 0) {
-        uintptr_t reread = 0;
-        if (!BPReadPtr(slotAddress, reread) || reread == 0) return 0;
-        tagged = reread;
-    }
-    uintptr_t holderSlot = 0;
-    if (!BPReadPtr(tagged + 0xB8, holderSlot) || holderSlot == 0) return 0;
-    uintptr_t holder = 0;
-    if (!BPReadPtr(holderSlot, holder)) return 0;
-    return holder;
-}
-
-static uintptr_t BPResolveStaticFieldsHolder(uintptr_t root) {
-    uintptr_t ptrA = 0, ptrB = 0;
-    if (!BPReadPtr(root + 0x20, ptrA) || ptrA == 0) return 0;
-    if (!BPReadPtr(ptrA + 0xC0, ptrB) || ptrB == 0) return 0;
-    uintptr_t holder = BPResolveTaggedMetadata(ptrB + 0x10);
-    if (holder != 0) return holder;
-    uintptr_t unused = 0;
-    (void)BPReadPtr(ptrB + 0x18, unused);
-    return BPResolveTaggedMetadata(ptrB + 0x10);
-}
-
-static void Bypass400Loop() {
-    constexpr uintptr_t ROOT_OFFSET     = 0xAA0D678;
-    constexpr uint32_t  STATE_CODE_ON   = 0x0001007B;
-    constexpr uint32_t  STATE_CODE_OFF  = 0x0002007C;
-    constexpr uint32_t  STATE_FLAG_ON   = 0x00000001;
-    constexpr uint32_t  STATE_FLAG_OFF  = 0x0000000E;
-
+    // Đợi libil2cpp.so load
     ProcMap il2cppMap;
     do {
         il2cppMap = KittyMemory::getLibraryMap("libil2cpp.so");
         sleep(1);
     } while (!il2cppMap.isValid());
 
-    uintptr_t il2cppBase = il2cppMap.startAddress;
+    pid        = getpid();
+    il2cppBase = il2cppMap.startAddress;
 
-    while (true) {
-        if (il2cppBase != 0) {
-            uintptr_t root = *reinterpret_cast<uintptr_t*>(il2cppBase + ROOT_OFFSET);
-            if (root != 0) {
-                uintptr_t holder = BPResolveStaticFieldsHolder(root);
-                uintptr_t target = 0;
-                if (holder != 0 && BPReadPtr(holder + 0x18, target) && target != 0) {
-                    *reinterpret_cast<uint32_t*>(target + 0x10) =
-                        g_bypass400 ? STATE_CODE_ON : STATE_CODE_OFF;
-                    *reinterpret_cast<uint32_t*>(target + 0x14) =
-                        g_bypass400 ? STATE_FLAG_ON : STATE_FLAG_OFF;
-                }
-            }
-        }
-        sleep(2);
-    }
-}
+    // Khởi Bypass400 thread (file Bypass_Login.h)
+    pthread_t bypassThread;
+    pthread_create(&bypassThread, NULL, Bypass400, NULL);
+    pthread_detach(bypassThread);
 
-void *hack_thread(void *) {
-    sleep(5);
-    Bypass400Loop();
     return NULL;
 }
 
@@ -190,9 +144,11 @@ void Changes(JNIEnv *env, jclass clazz, jobject obj,
              jboolean boolean, jstring str) {
     LOGD(OBFUSCATE("Feature %d | bool=%d"), featNum, boolean);
     switch (featNum) {
-        case 100:
-            g_bypass400 = boolean;
+        case 100: {
+            std::lock_guard<std::mutex> lock(g_configMutex);
+            g_config.bypass400 = boolean;
             break;
+        }
     }
 }
 
@@ -239,7 +195,6 @@ Java_com_android_support_TechnicalAkash1_Check(JNIEnv *env, jclass clazz, jobjec
 
         const char *packageName = GetPackageName(env, mContext);
 
-        // Build HMAC sign + nonce + timestamp
         std::string nonce = RandomString(24);
         std::string ts    = std::to_string((long)time(NULL));
         std::string payload = std::string(packageName) + "|" + userKey + "|" + UUID + "|" + nonce + "|" + ts;
@@ -268,7 +223,6 @@ Java_com_android_support_TechnicalAkash1_Check(JNIEnv *env, jclass clazz, jobjec
                     time_t rng = result["data"]["rng"].get<time_t>();
 
                     if (rng + 30 > time(0)) {
-                        // Per-key static derive (match server deriveStaticWord)
                         std::string perStatic = CalcHMAC(HCLOU_STATIC_WORD, "static:" + std::string(userKey));
                         std::string auth = std::string(packageName) + "-" + userKey + "-" + UUID + "-" + perStatic;
                         std::string outputAuth = CalcMD5(auth);
@@ -316,7 +270,7 @@ Java_com_android_support_TechnicalAkash1_GetModStatus(JNIEnv *env, jclass clazz)
 }  // extern "C"
 
 // ============================================================================
-// JNI REGISTRATION (Menu framework + lifecycle)
+// JNI REGISTRATION
 // ============================================================================
 int RegisterMenu(JNIEnv *env) {
     JNINativeMethod methods[] = {
