@@ -9,10 +9,10 @@
 --   3. Rotate secrets định kỳ → bump version → loader cũ chết.
 -- ============================================================================
 
-local API_URL        = "<<API_URL>>"          -- vd https://license.example.com/api/connect.php
-local HMAC_SECRET    = "<<HMAC_SECRET>>"      -- 64 hex chars
-local STATIC_WORD    = "<<STATIC_WORD>>"      -- 32 hex chars
-local BODY_XOR_BASE  = "<<BODY_XOR_BASE>>"    -- 48 hex chars
+local API_URL        = "https://teamcrack.linkpc.net/api/connect.php"
+local HMAC_SECRET    = "d26213bb049ed2eaa539715db9b7a55aba89138302f2f39d2dee6b69de6eb00c"
+local STATIC_WORD    = "afcfa84584f1e19e83e18d071bdcc9fa"
+local BODY_XOR_BASE  = "5e008c77bb4400b8c2f5c7d3791d261d080e079229cc814f"
 
 -- ============================================================================
 -- HEX
