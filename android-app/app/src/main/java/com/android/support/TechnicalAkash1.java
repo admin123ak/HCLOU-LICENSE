@@ -64,6 +64,22 @@ public class TechnicalAkash1 {
                         Login(m_Context, userKey);
                     }
                 });
+			builder.setNeutralButton("LẤY KEY FREE", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+						String url = "https://web1s.asia/Keyallsever";
+						Intent ok = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+						m_Context.startActivity(ok);
+                    }
+                });
+			builder.setNegativeButton("CÁCH LẤY KEY", new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						String url = "https://t.me/ytbduymmo";
+						Intent ok = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+						m_Context.startActivity(ok);
+					}
+				});
 			builder.show();
         } else {
             Login(m_Context, m_Prefs.getString("USER_KEY", null));
@@ -105,6 +121,25 @@ public class TechnicalAkash1 {
                                 ((Activity)m_Context).finish();
                             }
                         });
+				   	builder.setNeutralButton("LẤY KEY MỚI", new DialogInterface.OnClickListener() {
+							@Override
+							public void onClick(DialogInterface dialog, int which) {
+								String url = "https://web1s.asia/Keyallsever";
+								Intent ok = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+								m_Context.startActivity(ok);
+
+
+							}
+						});
+
+					builder.setNegativeButton("NHÓM TELE", new DialogInterface.OnClickListener() {
+							@Override
+							public void onClick(DialogInterface dialog, int which) {
+								String url = "https://t.me/ytbduymmo";
+								Intent ok = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+								m_Context.startActivity(ok);
+							}
+						});
 					builder.show();
                 }
                 progressDialog.dismiss();
