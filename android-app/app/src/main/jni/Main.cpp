@@ -56,8 +56,8 @@ std::mutex  g_configMutex;
 // ============================================================================
 // HCLOU-LICENSE MASTER SECRETS — đồng bộ config.local.php server.
 // ============================================================================
-static const std::string HCLOU_HMAC_SECRET = "d26213bb049ed2eaa539715db9b7a55aba89138302f2f39d2dee6b69de6eb00c";
-static const std::string HCLOU_STATIC_WORD = "afcfa84584f1e19e83e18d071bdcc9fa";
+static const std::string HCLOU_HMAC_SECRET = "3601b133af42e867e1cffd82993561d37988e9917de27a4f22bc1cc5c803c83c";
+static const std::string HCLOU_STATIC_WORD = "b28f2faf89c3a6e21e9f0595f48f60b4";
 static const std::string HCLOU_API_URL     = "https://teamcrack.linkpc.net/api/connect.php";
 
 // ============================================================================
