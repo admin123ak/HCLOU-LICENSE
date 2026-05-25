@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    android:background="#0d1117">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="HCLOU FF"
+        android:textColor="#a78bfa"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Loader cho Free Fire (Root)"
+        android:textColor="#7a8499"
+        android:textSize="13sp"
+        android:layout_marginBottom="32dp" />
+
+    <EditText
+        android:id="@+id/etKey"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="HCLOU-XXXXXXXXXXXX"
+        android:textColor="#e2e8f0"
+        android:textColorHint="#5a6478"
+        android:textSize="15sp"
+        android:padding="14dp"
+        android:textAllCaps="true"
+        android:inputType="textCapCharacters|textNoSuggestions"
+        android:background="@drawable/bg_input"
+        android:layout_marginBottom="14dp" />
+
+    <Button
+        android:id="@+id/btnLogin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="VÀO GAME"
+        android:textColor="#fff"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:padding="14dp"
+        android:background="@drawable/bg_btn_primary"
+        android:layout_marginBottom="14dp" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#94a3b8"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:padding="10dp"
+        android:lineSpacingMultiplier="1.4"
+        android:layout_marginBottom="14dp" />
+
+    <Button
+        android:id="@+id/btnStart"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="START MOD"
+        android:textColor="#fff"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:padding="14dp"
+        android:background="@drawable/bg_btn_secondary"
+        android:enabled="false" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🔒 Bảo vệ bởi HCLOU License"
+        android:textColor="#4a5568"
+        android:textSize="11sp"
+        android:layout_marginTop="32dp" />
+
+</LinearLayout>
