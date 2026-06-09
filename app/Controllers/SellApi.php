@@ -137,6 +137,50 @@ class SellApi extends Controller
     }
 
     // =========================================================
+    //  POST /api/sell/keyinfo  -> trạng thái thật của key (cho web bán đồng bộ)
+    //  params: keys = "key1,key2,..." (hoặc 1 key)
+    //  Trả devices/max/expired/status thật từ panel theo từng user_key.
+    // =========================================================
+    public function keyinfo()
+    {
+        if (!$this->auth($err)) return $this->json(['status' => false, 'reason' => $err], 401);
+
+        $raw = service('request')->getPost('keys');
+        $list = is_array($raw) ? $raw : explode(',', (string) $raw);
+        $out = [];
+        $now = new \CodeIgniter\I18n\Time('now');
+        foreach ($list as $uk) {
+            $uk = trim((string) $uk);
+            if ($uk === '') continue;
+            // Chỉ key do chính token-user tạo (bảo mật)
+            $k = $this->keysModel->where('user_key', $uk)
+                ->where('registrator', $this->user->username)->get()->getRowArray();
+            if (!$k) { $out[$uk] = null; continue; }
+
+            // Đếm thiết bị từ chuỗi devices (CSV serial)
+            $devCount = 0;
+            if (!empty($k['devices'])) {
+                $devCount = count(array_filter(explode(',', $k['devices']), fn($s) => trim($s) !== ''));
+            }
+            $exp = $k['expired_date'] ?? null;
+            $isExpired = false;
+            if (!empty($exp)) {
+                try { $isExpired = (new \CodeIgniter\I18n\Time($exp))->isBefore($now); } catch (\Throwable $e) {}
+            }
+            $out[$uk] = [
+                'devices'      => $devCount,
+                'max_devices'  => (int) $k['max_devices'],
+                'duration'     => (int) $k['duration'],
+                'expired_date' => $exp,                 // NULL = chưa kích hoạt (chưa login)
+                'activated'    => !empty($exp),
+                'locked'       => ((int) $k['status']) !== 1, // status 0 = khoá
+                'expired'      => $isExpired,
+            ];
+        }
+        return $this->json(['status' => true, 'keys' => $out]);
+    }
+
+    // =========================================================
     //  GET /api/sell/balance  -> số dư
     // =========================================================
     public function balance()
