@@ -296,7 +296,7 @@ class User extends BaseController
         if (!$this->validate($form_rules)) {
             return redirect()->back()->withInput()->with('msgDanger', 'Something wrong! Please check the form');
         } else {
-            $newPassword = create_password($current);
+            $newPassword = create_password($password);
             $this->model->update(session('userid'), ['password' => $newPassword]);
             return redirect()->back()->with('msgSuccess', 'Password Successfuly Changed.');
         }

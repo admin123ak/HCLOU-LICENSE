@@ -131,34 +131,32 @@ class Auth extends BaseController
         ];
 
         if (!$this->validate($form_rules)) {
-            // Form Invalid
+            // Hiện lỗi cụ thể (username trùng / mật khẩu ngắn / referral...) thay vì generic
+            $errs = implode(' ', $this->validator->getErrors());
+            return redirect()->route('register')->withInput()->with('msgDanger', $errs ?: 'Vui lòng kiểm tra lại thông tin.');
         } else {
             $mCode = new CodeModel();
             $rCheck = $mCode->checkCode($referral);
-            $validation = Services::validation();
             if (!$rCheck) {
-                $validation->setError('referral', 'Wrong referral, please try again.');
-            } else {
-                if ($rCheck->used_by) {
-                    $validation->setError('referral', "Wrong referral, code has been used &middot; $rCheck->used_by.");
-                } else {
-                    $hashPassword = create_password($password);
-                    $data_register = [
-                        'username' => $username,
-                        'password' => $hashPassword,
-                        'saldo' => $rCheck->set_saldo ?: 0,
-                        'uplink' => $rCheck->created_by
-                    ];
-                    $ids = $this->userModel->insert($data_register, true);
-                    if ($ids) {
-                        $mCode->useReferral($referral);
-                        $msg = "Register Successfuly!";
-                        return redirect()->to('login')->with('msgSuccess', $msg);
-                    }
-                }
+                return redirect()->route('register')->withInput()->with('msgDanger', 'Sai mã referral hoặc mã không tồn tại.');
+            }
+            if ($rCheck->used_by) {
+                return redirect()->route('register')->withInput()->with('msgDanger', 'Mã referral đã được sử dụng bởi: ' . $rCheck->used_by);
+            }
+            $hashPassword = create_password($password);
+            $data_register = [
+                'username' => $username,
+                'password' => $hashPassword,
+                'saldo' => $rCheck->set_saldo ?: 0,
+                'uplink' => $rCheck->created_by
+            ];
+            $ids = $this->userModel->insert($data_register, true);
+            if ($ids) {
+                $mCode->useReferral($referral, $username); // đánh dấu mã đã dùng (truyền username)
+                return redirect()->to('login')->with('msgSuccess', 'Đăng ký thành công! Mời đăng nhập.');
             }
         }
-        return redirect()->route('register')->withInput()->with('msgDanger', '<strong>Failed</strong> Please check the form.');
+        return redirect()->route('register')->withInput()->with('msgDanger', 'Đăng ký thất bại, vui lòng thử lại.');
     }
 
     public function logout()
