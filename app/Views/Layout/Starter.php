@@ -177,7 +177,13 @@
 </head>
 
 <body>
-<?php $loggedIn = session()->has('userid'); ?>
+<?php
+$loggedIn = session()->has('userid');
+// Fallback an toàn: nếu view nào quên truyền $user, lấy từ session/model để sidebar không vỡ
+if ($loggedIn && (!isset($user) || !is_object($user))) {
+    try { $user = (new \App\Models\UserModel())->getUser(); } catch (\Throwable $e) { $user = null; }
+}
+?>
 <div class="lx-shell">
     <?php if ($loggedIn): ?>
         <!-- ===== SIDEBAR ===== -->
@@ -209,7 +215,7 @@
             <?php endif; ?>
             <div class="lx-navgroup" style="margin-top:auto">
                 <div class="lx-navlabel">Tài khoản</div>
-                <a class="lx-navitem <?= ($seg==='settings') ? 'active':'' ?>" href="<?= site_url('settings') ?>"><i class="bi bi-gear"></i> Settings</a>
+                <a class="lx-navitem <?= $isActive('settings') ?>" href="<?= site_url('settings') ?>"><i class="bi bi-gear"></i> Settings</a>
                 <a class="lx-navitem danger" href="<?= site_url('logout') ?>"><i class="bi bi-box-arrow-left"></i> Logout</a>
             </div>
         </aside>
@@ -221,9 +227,10 @@
         <div class="lx-topbar">
             <button class="lx-burger" onclick="lxToggle()"><i class="bi bi-list"></i></button>
             <div class="lx-topbar-title"><?= isset($title) ? $title : 'Panel' ?></div>
+            <?php $uname = (isset($user) && is_object($user)) ? getName($user) : 'User'; ?>
             <a class="lx-userchip" href="<?= site_url('settings') ?>">
-                <span class="av"><?= strtoupper(substr(getName($user), 0, 1)) ?></span>
-                <?= getName($user) ?>
+                <span class="av"><?= strtoupper(substr($uname, 0, 1)) ?></span>
+                <?= esc($uname) ?>
             </a>
         </div>
         <main class="lx-content">
