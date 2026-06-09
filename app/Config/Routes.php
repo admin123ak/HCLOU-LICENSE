@@ -52,6 +52,10 @@ $routes->group('admin', ['filter' => 'admin'], function ($routes) {
 	$routes->match(['get', 'post'], 'create-referral', 'User::ref_index');
 	$routes->match(['get', 'post'], 'manage-users', 'User::manage_users');
 	$routes->match(['get', 'post'], 'user/(:num)', 'User::user_edit/$1');
+	/* --------------------------- Games (quản lý game động) -------------------------- */
+	$routes->match(['get', 'post'], 'games', 'Games::index');
+	$routes->post('games/save', 'Games::save');
+	$routes->post('games/delete', 'Games::delete');
 	/* --------------------------- Admin API Grouping -------------------------- */
 	$routes->group('api', function ($routes) {
 		$routes->match(['get', 'post'], 'users', 'User::api_get_users');

@@ -51,7 +51,7 @@
                 </div>
                 <div class="form-group mb-3">
                     <label for="duration" class="form-label">Duration</label>
-                    <?= form_dropdown(['class' => 'form-select', 'name' => 'duration', 'id' => 'duration'], $duration, old('duration') ?: '') ?>
+                    <select class="form-select" name="duration" id="duration"></select>
                     <?php if ($validation->hasError('duration')) : ?>
                         <small id="help-duration" class="text-danger"><?= $validation->getError('duration') ?></small>
                     <?php endif; ?>
@@ -73,24 +73,43 @@
 
 <?= $this->section('js') ?>
 <script>
+    // Map gói + giá theo từng game (key = game_code)
+    var DURATIONS = <?= json_encode($durationsByGame) ?>;
+    var PRICES = JSON.parse('<?= $pricesByGame ?>');
+
     $(document).ready(function() {
-        var price = JSON.parse('<?= $price ?>');
-        getPrice(price);
-        // When selected
-        $("#max_devices, #duration, #game").change(function() {
-            getPrice(price);
-        });
-        // try to get price
-        function getPrice(price) {
-            var price = price;
-            var device = $("#max_devices").val();
+        fillDurations();
+        estimate();
+
+        $("#game").change(function() { fillDurations(); estimate(); });
+        $("#max_devices, #duration").on('change input', estimate);
+
+        // Đổ danh sách gói (duration) theo game đang chọn
+        function fillDurations() {
+            var g = $("#game").val();
+            var list = DURATIONS[g] || {};
+            var $d = $("#duration").empty();
+            var keys = Object.keys(list);
+            if (!keys.length) {
+                $d.append('<option value="">-- Chưa có gói --</option>');
+                return;
+            }
+            keys.forEach(function(h) {
+                $d.append('<option value="' + h + '">' + list[h] + '</option>');
+            });
+        }
+
+        // Tính tạm tính = giá gói × số thiết bị
+        function estimate() {
+            var g = $("#game").val();
+            var device = parseInt($("#max_devices").val(), 10) || 0;
             var durate = $("#duration").val();
-            var gprice = price[durate];
-            if (gprice != NaN) {
-                var result = (device * gprice);
-                $("#estimation").val(result);
+            var priceTbl = PRICES[g] || {};
+            var gprice = parseFloat(priceTbl[durate]);
+            if (!isNaN(gprice)) {
+                $("#estimation").val('$' + (device * gprice));
             } else {
-                $("#estimation").val('Estimation error');
+                $("#estimation").val('—');
             }
         }
     });

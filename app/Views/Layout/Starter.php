@@ -209,6 +209,7 @@ if ($loggedIn && (!isset($user) || !is_object($user))) {
             <?php if ($lvl == 1): ?>
             <div class="lx-navgroup">
                 <div class="lx-navlabel">Admin</div>
+                <a class="lx-navitem <?= $isActive('admin/games') ?>" href="<?= site_url('admin/games') ?>"><i class="bi bi-controller"></i> Games</a>
                 <a class="lx-navitem <?= $isActive('manage-users') ?>" href="<?= site_url('admin/manage-users') ?>"><i class="bi bi-people"></i> Manage Users</a>
                 <a class="lx-navitem <?= $isActive('create-referral') ?>" href="<?= site_url('admin/create-referral') ?>"><i class="bi bi-person-plus"></i> Create Referral</a>
             </div>

@@ -177,3 +177,28 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+-- ============================================================
+-- Bảng games: quản lý game động cho panel (thay hardcode PUBG)
+-- durations = JSON: [{"hours":1,"price":10}, {"hours":24,"price":40}, ...]
+-- game_code = mã dùng cho API verify (keys_code.game)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `games` (
+  `id_game` INT(11) NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(64) NOT NULL,
+  `game_code` VARCHAR(32) NOT NULL,
+  `durations` TEXT DEFAULT NULL,
+  `status` TINYINT(1) DEFAULT 1,
+  `sort_order` INT(11) DEFAULT 0,
+  `created_at` DATETIME DEFAULT NULL,
+  `updated_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id_game`),
+  UNIQUE KEY `uniq_game_code` (`game_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- Seed: PUBG (giữ nguyên bảng giá hardcode cũ để không vỡ key đang chạy)
+INSERT INTO `games` (`name`, `game_code`, `durations`, `status`, `sort_order`, `created_at`, `updated_at`)
+SELECT 'PUBG Mobile', 'PUBG',
+  '[{"hours":1,"price":10},{"hours":5,"price":20},{"hours":24,"price":40},{"hours":72,"price":100},{"hours":168,"price":170},{"hours":336,"price":300},{"hours":720,"price":500},{"hours":1440,"price":800}]',
+  1, 0, NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM `games` WHERE `game_code`='PUBG');

@@ -16,34 +16,24 @@ class Keys extends BaseController
         $this->userModel = new UserModel();
         $this->user = $this->userModel->getUser();
         $this->model = new KeysModel();
+        $this->gameModel = new \App\Models\GameModel();
         $this->time = new \CodeIgniter\I18n\Time;
 
-        /* ------- Game ------- */
-        $this->game_list = [
-            'PUBG' => 'PUBG Mobile'
-        ];
+        /* ------- Game động từ DB ------- */
+        $this->game_list = $this->gameModel->dropdownList();
+        // Fallback nếu chưa import bảng games (giữ PUBG để không vỡ)
+        if (empty($this->game_list)) {
+            $this->game_list = ['PUBG' => 'PUBG Mobile'];
+        }
+    }
 
-        $this->duration = [
-            1 => '1 Hours &mdash; $10/Device',
-            5 => '5 Hours &mdash; $20/Device',
-            24 => '1 Days &mdash; $40/Device',
-            72 => '3 Days &mdash; $100/Device',
-            168 => '7 Days &mdash; $170/Device',
-            336 => '14 Days &mdash; $300/Device',
-            720 => '30 Days &mdash; $500/Device',
-            1440 => '60 Days &mdash; $800/Device',
-        ];
-
-        $this->price = [
-            1 => 10,
-            5 => 20,
-            24 => 40,
-            72 => 100,
-            168 => 170,
-            336 => 300,
-            720 => 500,
-            1440 => 800,
-        ];
+    /** Lấy bảng giá [hours=>price] của 1 game theo game_code (dùng cho validate giá) */
+    private function priceForGame($game_code)
+    {
+        $g = $this->gameModel->where('game_code', $game_code)->first();
+        if ($g) return \App\Models\GameModel::priceMap($g['durations']);
+        // Fallback bảng giá PUBG cũ
+        return [1=>10,5=>20,24=>40,72=>100,168=>170,336=>300,720=>500,1440=>800];
     }
 
     public function index()
@@ -261,13 +251,27 @@ class Keys extends BaseController
             $message = setMessage("Please top up to your beloved admin.", 'warning');
         }
 
+        // Build map theo từng game: durations (label) + prices, để JS đổi gói khi chọn game khác
+        $games = $this->gameModel->getActive();
+        $durationsByGame = [];
+        $pricesByGame = [];
+        foreach ($games as $g) {
+            $durationsByGame[$g['game_code']] = \App\Models\GameModel::durationLabels($g['durations']);
+            $pricesByGame[$g['game_code']]    = \App\Models\GameModel::priceMap($g['durations']);
+        }
+        // Fallback PUBG nếu chưa có bảng games
+        if (empty($durationsByGame)) {
+            $durationsByGame['PUBG'] = [1=>'1 Hours &mdash; $10/Device',5=>'5 Hours &mdash; $20/Device',24=>'1 Days &mdash; $40/Device',72=>'3 Days &mdash; $100/Device',168=>'7 Days &mdash; $170/Device',336=>'14 Days &mdash; $300/Device',720=>'30 Days &mdash; $500/Device',1440=>'60 Days &mdash; $800/Device'];
+            $pricesByGame['PUBG'] = [1=>10,5=>20,24=>40,72=>100,168=>170,336=>300,720=>500,1440=>800];
+        }
+
         $data = [
             'title' => 'Generate',
             'user' => $user,
             'time' => $this->time,
             'game' => $this->game_list,
-            'duration' => $this->duration,
-            'price' => json_encode($this->price),
+            'durationsByGame' => $durationsByGame,
+            'pricesByGame' => json_encode($pricesByGame),
             'messages' => $message,
             'validation' => $validation,
         ];
@@ -280,7 +284,9 @@ class Keys extends BaseController
         $game = $this->request->getPost('game');
         $maxd = $this->request->getPost('max_devices');
         $drtn = $this->request->getPost('duration');
-        $getPrice = getPrice($this->price, $drtn, $maxd);
+        // Giá theo bảng giá của ĐÚNG game được chọn (chống chỉnh giá phía client)
+        $priceTable = $this->priceForGame($game);
+        $getPrice = getPrice($priceTable, $drtn, $maxd);
 
         $game_list = implode(",", array_keys($this->game_list));
         $form_rules = [
