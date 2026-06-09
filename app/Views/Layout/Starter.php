@@ -64,16 +64,23 @@
     .lx-brand .lx-name{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:18px;background:var(--accent);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
     .lx-brand .lx-sub{font-size:9.5px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:3px}
 
+    /* Sidebar scrollbar mảnh */
+    .lx-sidebar::-webkit-scrollbar{width:6px}
+    .lx-sidebar::-webkit-scrollbar-thumb{background:rgba(120,150,200,.2);border-radius:99px}
     /* Sidebar nav */
-    .lx-navgroup{padding:14px 0 4px}
-    .lx-navlabel{font-size:9.5px;font-weight:800;color:#566685;padding:6px 20px;letter-spacing:.16em;text-transform:uppercase}
-    .lx-navitem{display:flex;align-items:center;gap:12px;margin:1px 12px 1px 0;padding:10px 18px;border-radius:0 13px 13px 0;
-      color:#a7b6d2;text-decoration:none;font-size:13.5px;font-weight:600;transition:.18s cubic-bezier(.4,0,.2,1);position:relative}
-    .lx-navitem i{font-size:16px;width:20px;text-align:center}
-    .lx-navitem:hover{background:rgba(255,255,255,.045);color:#fff;transform:translateX(2px)}
-    .lx-navitem.active{background:linear-gradient(90deg,rgba(99,102,241,.22),rgba(34,211,238,.05));color:#fff;font-weight:800}
-    .lx-navitem.active::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;background:var(--accent);border-radius:0 4px 4px 0;box-shadow:0 0 14px rgba(99,102,241,.7)}
+    .lx-navgroup{padding:12px 0 4px}
+    .lx-navlabel{font-size:10px;font-weight:800;color:#5a6e8c;padding:6px 22px;letter-spacing:.15em;text-transform:uppercase}
+    .lx-navitem{display:flex;align-items:center;gap:13px;margin:2px 12px 2px 0;padding:11px 20px;border-radius:0 12px 12px 0;
+      color:#aab8d4;text-decoration:none;font-size:14px;font-weight:600;transition:.18s cubic-bezier(.4,0,.2,1);position:relative}
+    .lx-navitem i{font-size:17px;width:22px;text-align:center;opacity:.85}
+    .lx-navitem:hover{background:rgba(255,255,255,.05);color:#fff}
+    .lx-navitem:hover i{opacity:1}
+    .lx-navitem.active{background:linear-gradient(90deg,rgba(99,102,241,.26),rgba(34,211,238,.04));color:#fff;font-weight:700}
+    .lx-navitem.active i{opacity:1;color:var(--cyan)}
+    .lx-navitem.active::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;background:var(--accent);border-radius:0 4px 4px 0;box-shadow:0 0 14px rgba(99,102,241,.8)}
+    .lx-navitem.danger{color:#f0a0a0}
     .lx-navitem.danger:hover{background:rgba(248,113,113,.14);color:#fca5a5}
+    .lx-navitem.danger i{color:#f0a0a0}
 
     /* Topbar user */
     .lx-burger{background:none;border:1px solid var(--line2);color:#cdd9ee;width:40px;height:40px;border-radius:11px;display:none;align-items:center;justify-content:center;cursor:pointer;font-size:18px}
@@ -193,32 +200,44 @@ if ($loggedIn && (!isset($user) || !is_object($user))) {
                 <span><span class="lx-name"><?= BASE_NAME ?></span><div class="lx-sub">License Panel</div></span>
             </a>
             <?php
-                $curPath = trim(parse_url(current_url(), PHP_URL_PATH) ?? '', '/');
-                $isActive = function($needle) use ($curPath) {
-                    return (strpos($curPath, $needle) !== false) ? 'active' : '';
+                // Chuẩn hoá path hiện tại (bỏ baseURL subfolder) -> chỉ giữ route panel
+                $curPath = trim((string) parse_url(current_url(), PHP_URL_PATH), '/');
+                $baseSub = trim((string) parse_url(rtrim(base_url(), '/'), PHP_URL_PATH), '/');
+                if ($baseSub !== '' && strpos($curPath, $baseSub) === 0) {
+                    $curPath = trim(substr($curPath, strlen($baseSub)), '/');
+                }
+                // Bỏ 'index.php/' nếu có
+                $curPath = preg_replace('#^index\.php/?#', '', $curPath);
+                if ($curPath === '') $curPath = 'dashboard'; // trang gốc = dashboard
+
+                // active CHÍNH XÁC: khớp đúng route đầu (tránh nhiều mục cùng sáng)
+                $active = function($routes) use ($curPath) {
+                    foreach ((array)$routes as $r) {
+                        if ($curPath === $r || strpos($curPath, $r . '/') === 0) return 'active';
+                    }
+                    return '';
                 };
                 $lvl = isset($user->level) ? (int)$user->level : 2;
-                $onGen = strpos($curPath, 'keys/generate') !== false;
             ?>
             <div class="lx-navgroup">
                 <div class="lx-navlabel">Quản lý</div>
-                <a class="lx-navitem <?= $isActive('dashboard') ?>" href="<?= site_url('dashboard') ?>"><i class="bi bi-grid-1x2"></i> Dashboard</a>
-                <a class="lx-navitem <?= (strpos($curPath,'keys')!==false && !$onGen) ? 'active':'' ?>" href="<?= site_url('keys') ?>"><i class="bi bi-key"></i> Keys</a>
-                <a class="lx-navitem <?= $onGen ? 'active':'' ?>" href="<?= site_url('keys/generate') ?>"><i class="bi bi-plus-circle"></i> Generate Key</a>
+                <a class="lx-navitem <?= $active(['dashboard']) ?>" href="<?= site_url('dashboard') ?>"><i class="bi bi-grid-1x2"></i> Dashboard</a>
+                <a class="lx-navitem <?= ($curPath === 'keys') ? 'active' : '' ?>" href="<?= site_url('keys') ?>"><i class="bi bi-key"></i> Keys</a>
+                <a class="lx-navitem <?= $active(['keys/generate']) ?>" href="<?= site_url('keys/generate') ?>"><i class="bi bi-plus-circle"></i> Tạo Key</a>
             </div>
             <?php if ($lvl == 1): ?>
             <div class="lx-navgroup">
                 <div class="lx-navlabel">Admin</div>
-                <a class="lx-navitem <?= $isActive('admin/games') ?>" href="<?= site_url('admin/games') ?>"><i class="bi bi-controller"></i> Games</a>
-                <a class="lx-navitem <?= $isActive('manage-users') ?>" href="<?= site_url('admin/manage-users') ?>"><i class="bi bi-people"></i> Manage Users</a>
-                <a class="lx-navitem <?= $isActive('create-referral') ?>" href="<?= site_url('admin/create-referral') ?>"><i class="bi bi-person-plus"></i> Create Referral</a>
+                <a class="lx-navitem <?= $active(['admin/games']) ?>" href="<?= site_url('admin/games') ?>"><i class="bi bi-controller"></i> Games</a>
+                <a class="lx-navitem <?= $active(['admin/manage-users','admin/user']) ?>" href="<?= site_url('admin/manage-users') ?>"><i class="bi bi-people"></i> Quản lý Users</a>
+                <a class="lx-navitem <?= $active(['admin/create-referral']) ?>" href="<?= site_url('admin/create-referral') ?>"><i class="bi bi-person-plus"></i> Referral</a>
             </div>
             <?php endif; ?>
             <div class="lx-navgroup" style="margin-top:auto">
                 <div class="lx-navlabel">Tài khoản</div>
-                <a class="lx-navitem <?= $isActive('settings/api') ?>" href="<?= site_url('settings/api') ?>"><i class="bi bi-hdd-network"></i> API Token</a>
-                <a class="lx-navitem <?= (strpos($curPath,'settings')!==false && strpos($curPath,'settings/api')===false)?'active':'' ?>" href="<?= site_url('settings') ?>"><i class="bi bi-gear"></i> Settings</a>
-                <a class="lx-navitem danger" href="<?= site_url('logout') ?>"><i class="bi bi-box-arrow-left"></i> Logout</a>
+                <a class="lx-navitem <?= $active(['settings/api']) ?>" href="<?= site_url('settings/api') ?>"><i class="bi bi-hdd-network"></i> API Token</a>
+                <a class="lx-navitem <?= ($curPath === 'settings') ? 'active' : '' ?>" href="<?= site_url('settings') ?>"><i class="bi bi-gear"></i> Cài đặt</a>
+                <a class="lx-navitem danger" href="<?= site_url('logout') ?>"><i class="bi bi-box-arrow-left"></i> Đăng xuất</a>
             </div>
         </aside>
         <div class="lx-overlay" id="lxOverlay" onclick="lxToggle(false)"></div>
