@@ -8,16 +8,9 @@
         </div>
         <div class="col-lg-12">
             <div class="card shadow-sm">
-                <div class="card-header" text-white">
-                    <div class="row">
-                        <div class="col pt-1">
-                            Keys Registered
-                        </div>
-                        <div class="col text-end">
-                            <a class="btn btn-outline-light btn-sm" href="<?= site_url('keys/generate') ?>"><i class="bi bi-person-plus"></i> KEY</a>
-                            <button class="btn btn-secondary btn-sm ms-1" id="blur-out" data-bs-toggle="tooltip" data-bs-placement="top" title="Eye Protect"><i class="bi bi-eye-slash"></i></button>
-                        </div>
-                    </div>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-key"></i> Danh sách Key</span>
+                    <a class="btn btn-primary btn-sm" href="<?= site_url('keys/generate') ?>"><i class="bi bi-plus-lg"></i> Tạo Key</a>
                 </div>
                 <div class="card-body">
                     <?php if ($keylist) : ?>
@@ -46,7 +39,9 @@
                                     <tr>
                                         <td class="text-muted"><?= $k['id_keys'] ?></td>
                                         <td><span class="badge" style="background:rgba(99,102,241,.16);color:#c7d2fe;border:1px solid rgba(99,102,241,.3)"><?= esc($k['game']) ?></span></td>
-                                        <td><span class="<?= $isActive?'text-success':'text-danger' ?> keyBlur key-sensi" style="font-family:monospace;font-weight:700"><?= esc($k['user_key']) ?></span></td>
+                                        <td>
+                                            <span class="<?= $isActive?'text-success':'text-danger' ?>" style="font-family:monospace;font-weight:700;cursor:pointer" onclick="copyKey('<?= esc($k['user_key']) ?>')" title="Bấm để copy"><?= esc($k['user_key']) ?> <i class="bi bi-clipboard" style="font-size:11px;opacity:.6"></i></span>
+                                        </td>
                                         <td><span id="devMax-<?= esc($k['user_key']) ?>" style="font-weight:700;color:#fff"><?= $devCount ?>/<?= (int)$k['max_devices'] ?></span></td>
                                         <td><span style="font-weight:700;color:#fcd34d"><?= (int)$k['duration'] ?>h</span></td>
                                         <td>
@@ -65,9 +60,9 @@
                                         </td>
                                         <td>
                                             <div class="d-flex gap-1 justify-content-end flex-nowrap">
-                                                <a href="<?= site_url('keys/toggle/' . $k['id_keys']) ?>" class="btn btn-sm <?= $isActive?'btn-danger':'btn-success' ?>" title="<?= $isActive?'Khoá key':'Mở key' ?>"
-                                                   onclick="return confirm('<?= $isActive?'Khoá':'Mở' ?> key này?')"><i class="bi bi-<?= $isActive?'lock-fill':'unlock-fill' ?>"></i></a>
-                                                <button class="btn btn-secondary btn-sm" onclick="resetUserKey('<?= esc($k['user_key']) ?>')" title="Reset thiết bị"><i class="bi bi-arrow-repeat"></i></button>
+                                                <button type="button" class="btn btn-sm <?= $isActive?'btn-danger':'btn-success' ?>" title="<?= $isActive?'Khoá key':'Mở key' ?>"
+                                                   onclick="toggleKey(<?= (int)$k['id_keys'] ?>, <?= $isActive?'true':'false' ?>, '<?= esc($k['user_key']) ?>')"><i class="bi bi-<?= $isActive?'lock-fill':'unlock-fill' ?>"></i></button>
+                                                <button type="button" class="btn btn-secondary btn-sm" onclick="resetUserKey('<?= esc($k['user_key']) ?>')" title="Reset thiết bị"><i class="bi bi-arrow-repeat"></i></button>
                                                 <a href="<?= site_url('keys/' . $k['id_keys']) ?>" class="btn btn-primary btn-sm" title="Sửa key"><i class="bi bi-pencil"></i></a>
                                             </div>
                                         </td>
@@ -96,72 +91,71 @@
 
 <?= script_tag("https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap5.min.js") ?>
 <script>
-    $(document).ready(function() {
-        var table = $('#datatable').DataTable({
-            order: [
-                [0, "desc"]
-            ]
-        });
+    // Cấu hình SweetAlert đồng bộ theme tối
+    var SW = { background:'#161f33', color:'#eef3fb', confirmButtonColor:'#6366f1', cancelButtonColor:'#475569' };
 
-        $("#blur-out").click(function() {
-            if ($(".keyBlur").hasClass("key-sensi")) {
-                $(".keyBlur").removeClass("key-sensi");
-                $("#blur-out").html(`<i class="bi bi-eye"></i>`);
-            } else {
-                $(".keyBlur").addClass("key-sensi");
-                $("#blur-out").html(`<i class="bi bi-eye-slash"></i>`);
-            }
-        });
+    $(document).ready(function() {
+        $('#datatable').DataTable({ order: [[0, "desc"]] });
     });
 
+    // Copy license key
+    function copyKey(k){
+        if(navigator.clipboard){ navigator.clipboard.writeText(k); }
+        else { var t=document.createElement('textarea'); t.value=k; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+        Toast.fire({ icon:'success', title:'Đã copy key!' });
+    }
+
+    // Reset thiết bị của key
     function resetUserKey(keys) {
-        Swal.fire({
-            title: 'Are you sure?',
-            text: "You won't be able to revert this!",
+        Swal.fire(Object.assign({}, SW, {
+            title: 'Reset thiết bị?',
+            text: "Key này sẽ được gỡ khỏi tất cả thiết bị đã đăng nhập.",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Yes, reset'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                Toast.fire({
-                    icon: 'info',
-                    title: 'Please wait...'
-                })
-
-                var api_url = "<?= site_url('keys/reset') ?>";
-                $.getJSON(api_url, {
-                        userkey: keys,
-                        reset: 1
-                    },
-                    function(data, textStatus, jqXHR) {
-                        if (textStatus == 'success') {
-                            if (data.registered) {
-                                if (data.reset) {
-                                    $(`#devMax-${keys}`).html(`0/${data.devices_max}`);
-                                    Swal.fire(
-                                        'Reset!',
-                                        'Your device key has been reset.',
-                                        'success'
-                                    )
-                                } else {
-                                    Swal.fire(
-                                        'Failed!',
-                                        data.devices_total ? "You don't have any access to this user." : "User key devices already reset.",
-                                        data.devices_total ? 'error' : 'warning'
-                                    )
-                                }
-                            } else {
-                                Swal.fire(
-                                    'Failed!',
-                                    "User key no longer exists.",
-                                    'error'
-                                )
-                            }
-                        }
+            confirmButtonText: '<i class="bi bi-arrow-repeat"></i> Reset',
+            cancelButtonText: 'Huỷ'
+        })).then(function(result) {
+            if (!result.isConfirmed) return;
+            Swal.fire(Object.assign({}, SW, { title:'Đang xử lý...', didOpen:function(){Swal.showLoading();}, allowOutsideClick:false }));
+            $.ajax({
+                url: "<?= site_url('keys/reset') ?>",
+                method: 'GET',
+                data: { userkey: keys, reset: 1 },
+                dataType: 'json'
+            }).done(function(data){
+                if (data && data.registered) {
+                    if (data.reset) {
+                        $('#devMax-' + keys).html('0/' + data.devices_max);
+                        Swal.fire(Object.assign({}, SW, { title:'Thành công!', text:'Đã reset thiết bị về 0.', icon:'success' }));
+                    } else {
+                        Swal.fire(Object.assign({}, SW, {
+                            title: 'Không thể reset',
+                            text: data.devices_total ? 'Bạn không có quyền với key này.' : 'Key chưa có thiết bị nào để reset.',
+                            icon: data.devices_total ? 'error' : 'info'
+                        }));
                     }
-                );
+                } else {
+                    Swal.fire(Object.assign({}, SW, { title:'Lỗi', text:'Key không tồn tại.', icon:'error' }));
+                }
+            }).fail(function(xhr){
+                Swal.fire(Object.assign({}, SW, { title:'Lỗi kết nối', text:'Không gọi được server (mã '+xhr.status+'). Thử tải lại trang.', icon:'error' }));
+            });
+        });
+    }
+
+    // Khoá / mở key
+    function toggleKey(id, isActive, keyName) {
+        Swal.fire(Object.assign({}, SW, {
+            title: isActive ? 'Khoá key này?' : 'Mở key này?',
+            text: isActive ? 'Người dùng sẽ không thể đăng nhập bằng key này.' : 'Key sẽ hoạt động trở lại.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: isActive ? '<i class="bi bi-lock-fill"></i> Khoá' : '<i class="bi bi-unlock-fill"></i> Mở',
+            cancelButtonText: 'Huỷ',
+            confirmButtonColor: isActive ? '#dc2626' : '#10b981'
+        })).then(function(result) {
+            if (result.isConfirmed) {
+                window.location.href = "<?= site_url('keys/toggle/') ?>" + id;
             }
         });
     }

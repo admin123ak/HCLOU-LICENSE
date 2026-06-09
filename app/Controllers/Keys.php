@@ -66,7 +66,6 @@ class Keys extends BaseController
 
     public function api_key_reset()
     {
-        sleep(1);
         $model = $this->model;
         $keys = $this->request->getGet('userkey');
         $reset = $this->request->getGet('reset');

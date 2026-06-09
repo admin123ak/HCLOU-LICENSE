@@ -42,11 +42,11 @@ $routes->match(['get', 'post'], 'settings', 'User::settings');
 $routes->group('keys', function ($routes) {
 	$routes->match(['get', 'post'], '/', 'Keys::index');
 	$routes->match(['get', 'post'], 'generate', 'Keys::generate');
+	$routes->get('reset', 'Keys::api_key_reset');
+	$routes->match(['get', 'post'], 'api', 'Keys::api_get_keys');
+	$routes->post('edit', 'Keys::edit_key');
 	$routes->get('toggle/(:num)', 'Keys::toggle_status/$1');
 	$routes->get('(:num)', 'Keys::edit_key/$1');
-	$routes->get('reset', 'Keys::api_key_reset');
-	$routes->post('edit', 'Keys::edit_key');
-	$routes->match(['get', 'post'], 'api', 'Keys::api_get_keys');
 });
 
 $routes->group('admin', ['filter' => 'admin'], function ($routes) {

@@ -139,8 +139,8 @@
     .alert-warning{background:linear-gradient(135deg,rgba(251,191,36,.13),rgba(251,191,36,.04))!important;border-color:rgba(251,191,36,.3)!important;color:#fde68a!important}
     .alert-secondary{background:rgba(99,102,241,.1)!important;border-color:var(--line2)!important;color:#c7d4ea!important}
 
-    .key-sensi{filter:blur(3px);transition:filter .2s;cursor:pointer}
-    .key-sensi:hover{filter:blur(0)}
+    /* Không làm mờ key nữa - hiện rõ luôn */
+    .key-sensi{filter:none}
 
     .after-card small{background:rgba(255,255,255,.04)!important;border:1px solid var(--line2);color:var(--muted)!important;border-radius:999px;display:inline-block;padding:7px 16px!important}
     .after-card a{color:var(--cyan)!important;text-decoration:none;font-weight:700}
