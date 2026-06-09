@@ -57,6 +57,7 @@
                                     "durs" => $durs,
                                 ], JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?>)'><i class="bi bi-pencil"></i></button>
                             <form method="post" action="<?= site_url('admin/games/delete') ?>" style="display:inline" onsubmit="return confirm('Xoá game <?= esc($g['name']) ?>?')">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="id_game" value="<?= $g['id_game'] ?>">
                                 <button class="btn btn-danger btn-sm" title="Xoá"><i class="bi bi-trash"></i></button>
                             </form>
@@ -78,6 +79,7 @@
             <button class="btn btn-secondary btn-sm" onclick="gmClose()">✕</button>
         </div>
         <form method="post" action="<?= site_url('admin/games/save') ?>">
+            <?= csrf_field() ?>
             <div class="card-body">
                 <input type="hidden" name="id_game" id="gm_id" value="">
                 <div class="row">
