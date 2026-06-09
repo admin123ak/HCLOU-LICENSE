@@ -97,6 +97,24 @@ class Keys extends BaseController
         return $this->response->setJSON($real_response);
     }
 
+    /** Khoá / mở key nhanh (đảo status). Admin: mọi key; reseller: chỉ key mình tạo */
+    public function toggle_status($id = false)
+    {
+        $id = (int) $id;
+        $dKey = $this->model->getKeys($id, 'id_keys');
+        $user = $this->user;
+        if (!$dKey) {
+            return redirect()->to('keys')->with('msgDanger', 'Key không tồn tại.');
+        }
+        if ($user->level == 1 || $dKey->registrator == $user->username) {
+            $new = ((int) $dKey->status === 1) ? 0 : 1;
+            $this->model->update($id, ['status' => $new]);
+            $msg = $new ? 'Đã MỞ key.' : 'Đã KHOÁ key.';
+            return redirect()->to('keys')->with('msgSuccess', $msg);
+        }
+        return redirect()->to('keys')->with('msgDanger', 'Bạn không có quyền với key này.');
+    }
+
     public function edit_key($key = false)
     {
         if ($this->request->getPost()) return $this->edit_key_action();

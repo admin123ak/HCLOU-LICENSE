@@ -14,6 +14,13 @@
 
 <?= $this->include('Layout/msgStatus') ?>
 
+<?php if (!empty($noTable)): ?>
+<div class="alert alert-warning">
+    ⚠️ <b>Bảng <code>games</code> chưa tồn tại trong database.</b><br>
+    Hãy mở <code><?= site_url('fix_db.php') ?></code> (hoặc <a href="<?= base_url('fix_db.php') ?>" target="_blank" style="color:#fde68a;text-decoration:underline">bấm vào đây</a>) để tạo bảng, rồi quay lại trang này.
+</div>
+<?php endif; ?>
+
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-controller"></i> Quản lý Game</span>

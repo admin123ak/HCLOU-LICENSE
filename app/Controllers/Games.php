@@ -17,10 +17,20 @@ class Games extends BaseController
 
     public function index()
     {
+        // Nếu bảng games chưa tồn tại -> báo rõ thay vì trang trắng
+        if (!db_connect()->tableExists('games')) {
+            return view('Admin/games', [
+                'title' => 'Games',
+                'user' => $this->user,
+                'games' => [],
+                'noTable' => true,
+            ]);
+        }
         $data = [
             'title' => 'Games',
             'user' => $this->user,
             'games' => $this->model->getAllGames(),
+            'noTable' => false,
         ];
         return view('Admin/games', $data);
     }

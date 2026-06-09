@@ -42,6 +42,7 @@ $routes->match(['get', 'post'], 'settings', 'User::settings');
 $routes->group('keys', function ($routes) {
 	$routes->match(['get', 'post'], '/', 'Keys::index');
 	$routes->match(['get', 'post'], 'generate', 'Keys::generate');
+	$routes->get('toggle/(:num)', 'Keys::toggle_status/$1');
 	$routes->get('(:num)', 'Keys::edit_key/$1');
 	$routes->get('reset', 'Keys::api_key_reset');
 	$routes->post('edit', 'Keys::edit_key');

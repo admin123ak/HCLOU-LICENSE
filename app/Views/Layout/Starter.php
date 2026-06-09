@@ -257,6 +257,14 @@ function lxToggle(force){
   var open=(typeof force==='boolean')?force:!s.classList.contains('open');
   s.classList.toggle('open',open); if(o)o.classList.toggle('show',open);
 }
+// Toast dùng chung (trước nằm trong natacode.js — nhúng thẳng để luôn có)
+var Toast = Swal.mixin({
+  toast: true, position: 'top-end', showConfirmButton: false,
+  timer: 3000, timerProgressBar: true,
+  didOpen: function(t){ t.addEventListener('mouseenter', Swal.stopTimer); t.addEventListener('mouseleave', Swal.resumeTimer); }
+});
+// SweetAlert nền tối đồng bộ theme
+var _swalDark = { background:'#161f33', color:'#eef3fb' };
 </script>
 <?= $this->renderSection('js') ?>
 </body>

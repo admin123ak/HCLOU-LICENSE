@@ -27,30 +27,48 @@
                                     <tr>
                                         <th>#</th>
                                         <th>Game</th>
-                                        <th>User Keys</th>
-                                        <th>Devices</th>
-                                        <th>Duration</th>
-                                        <th>Expired</th>
-                                        <th>Action</th>
+                                        <th>License Key</th>
+                                        <th>Thiết bị</th>
+                                        <th>Gói</th>
+                                        <th>Hết hạn</th>
+                                        <th>Trạng thái</th>
+                                        <th class="text-end">Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($keylist as $k):
                                         $devCount = !empty($k['devices']) ? count(array_filter(explode(',', $k['devices']))) : 0;
-                                        $statusCls = !empty($k['status']) ? 'text-success' : 'text-danger';
-                                        $expTxt = !empty($k['expired_date']) ? date('d/m/y - H:i', strtotime($k['expired_date'])) : '(not started yet)';
+                                        $isActive = !empty($k['status']);
+                                        $expired  = !empty($k['expired_date']);
+                                        $expTxt   = $expired ? date('d/m/Y H:i', strtotime($k['expired_date'])) : '';
+                                        $isOver   = $expired && strtotime($k['expired_date']) < time();
                                     ?>
                                     <tr>
-                                        <td><?= $k['id_keys'] ?></td>
-                                        <td><?= esc($k['game']) ?></td>
-                                        <td><span class="<?= $statusCls ?> keyBlur key-sensi"><?= esc($k['user_key']) ?></span></td>
-                                        <td><span id="devMax-<?= esc($k['user_key']) ?>"><?= $devCount ?>/<?= (int)$k['max_devices'] ?></span></td>
-                                        <td><?= (int)$k['duration'] ?> Hours</td>
-                                        <td><?php if(!empty($k['expired_date'])): ?><span class="badge text-dark"><?= $expTxt ?></span><?php else: ?><span class="text-muted">(not started yet)</span><?php endif; ?></td>
+                                        <td class="text-muted"><?= $k['id_keys'] ?></td>
+                                        <td><span class="badge" style="background:rgba(99,102,241,.16);color:#c7d2fe;border:1px solid rgba(99,102,241,.3)"><?= esc($k['game']) ?></span></td>
+                                        <td><span class="<?= $isActive?'text-success':'text-danger' ?> keyBlur key-sensi" style="font-family:monospace;font-weight:700"><?= esc($k['user_key']) ?></span></td>
+                                        <td><span id="devMax-<?= esc($k['user_key']) ?>" style="font-weight:700;color:#fff"><?= $devCount ?>/<?= (int)$k['max_devices'] ?></span></td>
+                                        <td><span style="font-weight:700;color:#fcd34d"><?= (int)$k['duration'] ?>h</span></td>
                                         <td>
-                                            <div class="d-grid gap-2 d-md-block">
-                                                <button class="btn btn-outline-danger btn-sm" onclick="resetUserKey('<?= esc($k['user_key']) ?>')" title="Reset key?"><i class="bi bi-bootstrap-reboot"></i></button>
-                                                <a href="<?= site_url('keys/' . $k['id_keys']) ?>" class="btn btn-outline-dark btn-sm" title="Edit key"><i class="bi bi-person"></i></a>
+                                            <?php if($expired): ?>
+                                                <span style="font-weight:700;color:<?= $isOver?'#fca5a5':'#6ee7b7' ?>"><?= $expTxt ?></span>
+                                            <?php else: ?>
+                                                <span class="text-muted" style="font-style:italic">Chưa kích hoạt</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if($isActive): ?>
+                                                <span class="badge" style="background:rgba(52,211,153,.14);color:#6ee7b7;border:1px solid rgba(52,211,153,.3)">● Active</span>
+                                            <?php else: ?>
+                                                <span class="badge" style="background:rgba(248,113,113,.14);color:#fca5a5;border:1px solid rgba(248,113,113,.3)">🔒 Khoá</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex gap-1 justify-content-end flex-nowrap">
+                                                <a href="<?= site_url('keys/toggle/' . $k['id_keys']) ?>" class="btn btn-sm <?= $isActive?'btn-danger':'btn-success' ?>" title="<?= $isActive?'Khoá key':'Mở key' ?>"
+                                                   onclick="return confirm('<?= $isActive?'Khoá':'Mở' ?> key này?')"><i class="bi bi-<?= $isActive?'lock-fill':'unlock-fill' ?>"></i></a>
+                                                <button class="btn btn-secondary btn-sm" onclick="resetUserKey('<?= esc($k['user_key']) ?>')" title="Reset thiết bị"><i class="bi bi-arrow-repeat"></i></button>
+                                                <a href="<?= site_url('keys/' . $k['id_keys']) ?>" class="btn btn-primary btn-sm" title="Sửa key"><i class="bi bi-pencil"></i></a>
                                             </div>
                                         </td>
                                     </tr>
@@ -112,8 +130,7 @@
                     title: 'Please wait...'
                 })
 
-                var base_url = window.location.origin;
-                var api_url = `${base_url}/keys/reset`;
+                var api_url = "<?= site_url('keys/reset') ?>";
                 $.getJSON(api_url, {
                         userkey: keys,
                         reset: 1
