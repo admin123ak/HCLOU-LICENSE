@@ -31,6 +31,9 @@ class SellApi extends Controller
 
     public function __construct()
     {
+        // SellApi extends Controller thẳng (không qua BaseController) nên phải tự
+        // load text helper -> random_string() dùng trong buy() mới hoạt động.
+        helper('text');
         $this->userModel = new UserModel();
         $this->gameModel = new GameModel();
         $this->keysModel = new KeysModel();
