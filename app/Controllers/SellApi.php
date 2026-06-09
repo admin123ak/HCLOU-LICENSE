@@ -53,7 +53,9 @@ class SellApi extends Controller
         if ($token === '') { $err = 'MISSING_TOKEN'; return false; }
         if (!$this->db->tableExists('users')) { $err = 'DB_ERROR'; return false; }
 
-        $u = $this->userModel->where('api_token', $token)->first();
+        // LƯU Ý: Model mặc định returnType='array' -> phải lấy OBJECT (get()->getFirstRow())
+        // giống getUser(), nếu không $u->api_enabled trên array = null -> API_DISABLED nhầm.
+        $u = $this->userModel->where('api_token', $token)->get()->getFirstRow();
         if (!$u) { $err = 'INVALID_TOKEN'; return false; }
         if (empty($u->api_enabled)) { $err = 'API_DISABLED'; return false; }
         if (isset($u->status) && (int)$u->status !== 1) { $err = 'ACCOUNT_BLOCKED'; return false; }
