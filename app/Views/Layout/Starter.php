@@ -200,13 +200,9 @@ if ($loggedIn && (!isset($user) || !is_object($user))) {
                 <span><span class="lx-name"><?= BASE_NAME ?></span><div class="lx-sub">License Panel</div></span>
             </a>
             <?php
-                // Chuẩn hoá path hiện tại (bỏ baseURL subfolder) -> chỉ giữ route panel
-                $curPath = trim((string) parse_url(current_url(), PHP_URL_PATH), '/');
-                $baseSub = trim((string) parse_url(rtrim(base_url(), '/'), PHP_URL_PATH), '/');
-                if ($baseSub !== '' && strpos($curPath, $baseSub) === 0) {
-                    $curPath = trim(substr($curPath, strlen($baseSub)), '/');
-                }
-                // Bỏ 'index.php/' nếu có
+                // uri_string() = route sau baseURL (vd 'keys', 'settings/api') — chuẩn CI4,
+                // không lệ thuộc current_url/parse thủ công nên không lỗi khi deploy /public.
+                $curPath = trim((string) uri_string(), '/');
                 $curPath = preg_replace('#^index\.php/?#', '', $curPath);
                 if ($curPath === '') $curPath = 'dashboard'; // trang gốc = dashboard
 
