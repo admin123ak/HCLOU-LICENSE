@@ -36,21 +36,21 @@
                                 </thead>
                                 <tbody>
                                     <?php foreach ($keylist as $k):
-                                        $devCount = !empty($k->devices) ? count(array_filter(explode(',', $k->devices))) : 0;
-                                        $statusCls = $k->status ? 'text-success' : 'text-danger';
-                                        $expTxt = $k->expired_date ? date('d/m/y - H:i', strtotime($k->expired_date)) : '(not started yet)';
+                                        $devCount = !empty($k['devices']) ? count(array_filter(explode(',', $k['devices']))) : 0;
+                                        $statusCls = !empty($k['status']) ? 'text-success' : 'text-danger';
+                                        $expTxt = !empty($k['expired_date']) ? date('d/m/y - H:i', strtotime($k['expired_date'])) : '(not started yet)';
                                     ?>
                                     <tr>
-                                        <td><?= $k->id_keys ?></td>
-                                        <td><?= esc($k->game) ?></td>
-                                        <td><span class="<?= $statusCls ?> keyBlur key-sensi"><?= esc($k->user_key) ?></span></td>
-                                        <td><span id="devMax-<?= esc($k->user_key) ?>"><?= $devCount ?>/<?= (int)$k->max_devices ?></span></td>
-                                        <td><?= (int)$k->duration ?> Hours</td>
-                                        <td><?php if($k->expired_date): ?><span class="badge text-dark"><?= $expTxt ?></span><?php else: ?><span class="text-muted">(not started yet)</span><?php endif; ?></td>
+                                        <td><?= $k['id_keys'] ?></td>
+                                        <td><?= esc($k['game']) ?></td>
+                                        <td><span class="<?= $statusCls ?> keyBlur key-sensi"><?= esc($k['user_key']) ?></span></td>
+                                        <td><span id="devMax-<?= esc($k['user_key']) ?>"><?= $devCount ?>/<?= (int)$k['max_devices'] ?></span></td>
+                                        <td><?= (int)$k['duration'] ?> Hours</td>
+                                        <td><?php if(!empty($k['expired_date'])): ?><span class="badge text-dark"><?= $expTxt ?></span><?php else: ?><span class="text-muted">(not started yet)</span><?php endif; ?></td>
                                         <td>
                                             <div class="d-grid gap-2 d-md-block">
-                                                <button class="btn btn-outline-danger btn-sm" onclick="resetUserKey('<?= esc($k->user_key) ?>')" title="Reset key?"><i class="bi bi-bootstrap-reboot"></i></button>
-                                                <a href="<?= site_url('keys/' . $k->id_keys) ?>" class="btn btn-outline-dark btn-sm" title="Edit key"><i class="bi bi-person"></i></a>
+                                                <button class="btn btn-outline-danger btn-sm" onclick="resetUserKey('<?= esc($k['user_key']) ?>')" title="Reset key?"><i class="bi bi-bootstrap-reboot"></i></button>
+                                                <a href="<?= site_url('keys/' . $k['id_keys']) ?>" class="btn btn-outline-dark btn-sm" title="Edit key"><i class="bi bi-person"></i></a>
                                             </div>
                                         </td>
                                     </tr>
