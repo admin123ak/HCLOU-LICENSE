@@ -181,6 +181,27 @@ class SellApi extends Controller
     }
 
     // =========================================================
+    //  POST /api/sell/resetkey  -> reset thiết bị của 1 key (xoá devices)
+    //  params: key = user_key
+    // =========================================================
+    public function resetkey()
+    {
+        if (!$this->auth($err)) return $this->json(['status' => false, 'reason' => $err], 401);
+
+        $uk = trim((string) service('request')->getPost('key'));
+        if ($uk === '') return $this->json(['status' => false, 'reason' => 'MISSING_KEY'], 400);
+
+        $k = $this->keysModel->where('user_key', $uk)
+            ->where('registrator', $this->user->username)->get()->getRowArray();
+        if (!$k) { $this->log('reset', null, null, 0, $uk, 'KEY_NOT_FOUND'); return $this->json(['status' => false, 'reason' => 'KEY_NOT_FOUND'], 404); }
+
+        // Xoá danh sách thiết bị -> số thiết bị về 0, khách đổi máy login lại được
+        $this->keysModel->update($k['id_keys'], ['devices' => null]);
+        $this->log('reset', $k['game'] ?? null, (int)($k['duration'] ?? 0), 0, $uk, 'ok');
+        return $this->json(['status' => true, 'key' => $uk]);
+    }
+
+    // =========================================================
     //  GET /api/sell/balance  -> số dư
     // =========================================================
     public function balance()

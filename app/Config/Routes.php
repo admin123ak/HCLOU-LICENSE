@@ -75,6 +75,7 @@ $routes->group('api/sell', function ($routes) {
 	$routes->match(['get', 'post'], 'balance', 'SellApi::balance');
 	$routes->post('buy', 'SellApi::buy');
 	$routes->match(['get', 'post'], 'keyinfo', 'SellApi::keyinfo');
+	$routes->post('resetkey', 'SellApi::resetkey');
 });
 /*
  * --------------------------------------------------------------------
