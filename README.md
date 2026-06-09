@@ -1,93 +1,63 @@
-# HCLOU-LICENSE
+# CodeIgniter 4 Application Starter
 
-License server cho Lua/GameGuardian script. Tách biệt khỏi HCLOU shop.
+## What is CodeIgniter?
 
-## Vai trò
+CodeIgniter is a PHP full-stack web framework that is light, fast, flexible and secure.
+More information can be found at the [official site](http://codeigniter.com).
 
-- Gen key bulk format `HCLOU-XXXXXXXXXXXX` → export CSV → import vào HCLOU shop pool để bán.
-- Verify key + device binding + expire qua endpoint `/api/connect`.
-- Lưu script Lua body per game, trả về encrypted khi client request hợp lệ.
-- Admin panel: keys, scripts, bindings, logs, settings.
+This repository holds a composer-installable app starter.
+It has been built from the
+[development repository](https://github.com/codeigniter4/CodeIgniter4).
 
-## Stack
+More information about the plans for version 4 can be found in [the announcement](http://forum.codeigniter.com/thread-62615.html) on the forums.
 
-- PHP 7.4+ vanilla (không framework)
-- MySQL/MariaDB
-- Deploy shared cPanel-friendly (no CLI required)
+The user guide corresponding to this version of the framework can be found
+[here](https://codeigniter4.github.io/userguide/).
 
-## Cấu trúc
+## Installation & updates
 
-```
-/
-├── config.php          DB + secrets + helpers (clone HCLOU pattern)
-├── database.sql        Schema 6 tables
-├── install.php         Wizard cài đặt 5 bước qua web
-├── index.php           API info JSON
-├── admin/              Admin panel SPA-like
-├── api/                Endpoint /api/connect + auxiliary
-├── lib/                Helpers (keys, crypto, device fp)
-├── client/             HCLOU_Loader.lua template
-└── data/               Runtime (logs, rate-limit state)
-```
+`composer create-project codeigniter4/appstarter` then `composer update` whenever
+there is a new release of the framework.
 
-## Flow
+When updating, check the release notes to see if there are any changes you might need to apply
+to your `app` folder. The affected files can be copied or merged from
+`vendor/codeigniter4/framework/app`.
 
-```
-Admin → Bulk gen 100 key (status=unused) → Export CSV
-       ↓
-HCLOU shop → Import pool → User mua → User nhận key code
-       ↓
-User chạy HCLOU_Loader.lua trong GameGuardian
-       ↓
-Loader: prompt key + serial = hash(android_id+model+brand)
-       ↓
-POST /api/connect {game, user_key, serial, nonce, timestamp, hmac}
-       ↓
-Server verify (key+game+expire+rate+hmac+nonce) → bind device → return script_body XOR encoded
-       ↓
-Loader decrypt → load()() chạy trong memory
-```
+## Setup
 
-## Endpoint `/api/connect`
+Copy `env` to `.env` and tailor for your app, specifically the baseURL
+and any database settings.
 
-Pattern tham khảo demo PUBG mod menu, mở rộng cho Lua use case:
+## Important Change with index.php
 
-| Field | Old (demo C++) | New (Lua) |
-|---|---|---|
-| Request | game, user_key, serial | + nonce, timestamp, hmac |
-| Response | modname, mod_status, credit, token | + script_body (XOR encoded) |
-| Token | md5(game+key+serial+staticWord) | giữ — client verify |
-| Device bind | comma-separated serial trong cột devices | giữ pattern |
-| Max devices | per-key column | giữ |
+`index.php` is no longer in the root of the project! It has been moved inside the *public* folder,
+for better security and separation of components.
 
-## Anti-crack stack
+This means that you should configure your web server to "point" to your project's *public* folder, and
+not to the project root. A better practice would be to configure a virtual host to point there. A poor practice would be to point your web server to the project root and expect to enter *public/...*, as the rest of your logic and the
+framework are exposed.
 
-- ✓ Device binding (max_devices per key)
-- ✓ Expire check
-- ✓ Status block
-- ✓ Token MD5 client verify (replay 30s)
-- ✓ HMAC sign request (chống tamper)
-- ✓ Nonce + timestamp 60s (chống replay)
-- ✓ Rate limit per key (5 req/60s)
-- ✓ Banned devices blacklist
-- ✓ Script body XOR encoded (key derive từ user_key + device)
-- Future: mutation per-request, watermark per-buyer
+**Please** read the user guide for a better explanation of how CI4 works!
 
-## Deploy
+## Repository Management
 
-1. Upload toàn bộ lên host (cPanel/shared OK).
-2. Tạo DB MySQL trong cPanel/phpMyAdmin.
-3. Truy cập `/install.php` qua browser → wizard 5 bước (system check, DB config, import schema, admin account, done).
-4. Sau khi xong → xoá hoặc rename `install.php`, mở `/admin/` để vận hành.
+We use Github issues, in our main repository, to track **BUGS** and to track approved **DEVELOPMENT** work packages.
+We use our [forum](http://forum.codeigniter.com) to provide SUPPORT and to discuss
+FEATURE REQUESTS.
 
-## Format key
+This repository is a "distribution" one, built by our release preparation script.
+Problems with it can be raised on our forum, or as issues in the main repository.
 
-`HCLOU-` + 12 ký tự alphanum uppercase (loại I/O/0/1).
-Ví dụ: `HCLOU-A8X3K9P2MN7Q`.
+## Server Requirements
 
-## TODO
+PHP version 7.3 or higher is required, with the following extensions installed:
 
-- [x] Commit 1: skeleton + DB schema + install.php
-- [ ] Commit 2: admin panel (auth + tabs: keys, scripts, bindings, logs, settings)
-- [ ] Commit 3: API `/api/connect` + crypto + rate limit + HMAC
-- [ ] Commit 4: `HCLOU_Loader.lua` template + obfuscation guide
+- [intl](http://php.net/manual/en/intl.requirements.php)
+- [libcurl](http://php.net/manual/en/curl.requirements.php) if you plan to use the HTTP\CURLRequest library
+
+Additionally, make sure that the following extensions are enabled in your PHP:
+
+- json (enabled by default - don't turn it off)
+- [mbstring](http://php.net/manual/en/mbstring.installation.php)
+- [mysqlnd](http://php.net/manual/en/mysqlnd.install.php)
+- xml (enabled by default - don't turn it off)
