@@ -15,6 +15,16 @@ class Connect extends BaseController
         $this->staticWords = "Vm8Lk7Uj2JmsjCPVPVjrLa7zgfx3uz9E";
     }
 
+    /** Kiểm tra bảng games đã tồn tại chưa (tương thích panel chưa import) */
+    private function gamesTableExists()
+    {
+        try {
+            return db_connect()->tableExists('games');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public function index()
     {
         if ($this->request->getPost()) {
@@ -70,8 +80,37 @@ class Connect extends BaseController
             } else {
                 $time = new \CodeIgniter\I18n\Time;
                 $model = $this->model;
-                $findKey = $model
-                    ->getKeysGame(['user_key' => $uKey, 'game' => $game]);
+
+                // 1) Game phải tồn tại + đang bật trong hệ thống
+                $gameRow = (new \App\Models\GameModel())
+                    ->where('game_code', $game)->where('status', 1)->first();
+                // Nếu chưa import bảng games -> bỏ qua check này (tương thích cũ)
+                $gamesTableExists = $this->gamesTableExists();
+                if ($gamesTableExists && !$gameRow) {
+                    return $this->response->setJSON([
+                        'status' => false,
+                        'reason' => 'GAME NOT FOUND'
+                    ]);
+                }
+
+                // 2) Tìm key CHỈ theo user_key (để phân biệt sai key vs sai game)
+                $anyKey = $model->getKeys($uKey, 'user_key');
+                if (!$anyKey) {
+                    return $this->response->setJSON([
+                        'status' => false,
+                        'reason' => 'INVALID KEY'
+                    ]);
+                }
+                // 3) Key tồn tại nhưng KHÔNG dành cho game app đang gửi
+                if ($anyKey->game !== $game) {
+                    return $this->response->setJSON([
+                        'status' => false,
+                        'reason' => 'WRONG GAME',
+                        'key_for' => $anyKey->game   // app biết key này thuộc game nào
+                    ]);
+                }
+
+                $findKey = $anyKey; // key đúng game
 
                 if ($findKey) {
                     if ($findKey->status != 1) {
