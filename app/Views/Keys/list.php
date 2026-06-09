@@ -94,6 +94,16 @@
     // Cấu hình SweetAlert đồng bộ theme tối
     var SW = { background:'#161f33', color:'#eef3fb', confirmButtonColor:'#6366f1', cancelButtonColor:'#475569' };
 
+    // URL base lấy từ chính URL hiện tại (cùng origin + đúng subfolder) -> tránh sai domain/https
+    // Trang này luôn là .../keys -> cắt phần sau '/keys' để có base, rồi nối lại.
+    var KEYS_BASE = (function(){
+        var u = window.location.pathname;
+        var i = u.indexOf('/keys');
+        return (i >= 0 ? u.substring(0, i) : '') + '/keys';
+    })();
+    var RESET_URL  = KEYS_BASE + '/reset';
+    var TOGGLE_URL = KEYS_BASE + '/toggle/';
+
     $(document).ready(function() {
         $('#datatable').DataTable({ order: [[0, "desc"]] });
     });
@@ -118,7 +128,7 @@
             if (!result.isConfirmed) return;
             Swal.fire(Object.assign({}, SW, { title:'Đang xử lý...', didOpen:function(){Swal.showLoading();}, allowOutsideClick:false }));
             $.ajax({
-                url: "<?= site_url('keys/reset') ?>",
+                url: RESET_URL,
                 method: 'GET',
                 data: { userkey: keys, reset: 1 },
                 dataType: 'json'
@@ -138,7 +148,12 @@
                     Swal.fire(Object.assign({}, SW, { title:'Lỗi', text:'Key không tồn tại.', icon:'error' }));
                 }
             }).fail(function(xhr){
-                Swal.fire(Object.assign({}, SW, { title:'Lỗi kết nối', text:'Không gọi được server (mã '+xhr.status+'). Thử tải lại trang.', icon:'error' }));
+                var msg = 'Không gọi được server (mã '+xhr.status+').';
+                if (xhr.status === 0) msg = 'Không kết nối được tới: ' + RESET_URL + ' — kiểm tra baseURL / https.';
+                else if (xhr.status === 404) msg = 'Không tìm thấy route reset (404). Kiểm tra URL: ' + RESET_URL;
+                else if (xhr.status === 403) msg = 'Bị từ chối (403). Có thể chưa đăng nhập.';
+                else if (xhr.responseText) msg += ' ' + String(xhr.responseText).substring(0,120);
+                Swal.fire(Object.assign({}, SW, { title:'Lỗi kết nối', text:msg, icon:'error' }));
             });
         });
     }
@@ -155,7 +170,7 @@
             confirmButtonColor: isActive ? '#dc2626' : '#10b981'
         })).then(function(result) {
             if (result.isConfirmed) {
-                window.location.href = "<?= site_url('keys/toggle/') ?>" + id;
+                window.location.href = TOGGLE_URL + id;
             }
         });
     }
