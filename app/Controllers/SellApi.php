@@ -209,9 +209,10 @@ class SellApi extends Controller
                     $this->db->table('keys_pool')->where('id_pool', $poolRow['id_pool'])->update(['is_sold' => 1]);
                 }
             }
-            // Không có pool -> sinh key mới
+            // Không có pool -> sinh key mới.
+            // Dùng random_bytes (PHP gốc) thay random_string (cần text helper) -> không phụ thuộc helper.
             if ($license === null) {
-                $license = random_string('alnum', 16);
+                $license = bin2hex(random_bytes(8)); // 16 ký tự hex
             }
 
             // Insert vào keys_code (key chính, app verify từ đây)
@@ -234,6 +235,7 @@ class SellApi extends Controller
             }
         } catch (\Throwable $e) {
             $this->db->transRollback();
+            log_message('error', '[SELLAPI_BUY] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
             $this->log('buy', $game, $duration, $price, null, 'ERROR');
             return $this->json(['status'=>false,'reason'=>'SERVER_ERROR','detail'=>$e->getMessage()], 500);
         }
