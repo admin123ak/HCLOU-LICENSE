@@ -9,7 +9,7 @@ class UserModel extends Model
 {
     protected $table      = 'users';
     protected $primaryKey = 'id_users';
-    protected $allowedFields = ['username', 'fullname', 'saldo', 'level', 'status', 'uplink', 'password'];
+    protected $allowedFields = ['username', 'fullname', 'saldo', 'level', 'status', 'uplink', 'password', 'api_token', 'api_enabled'];
     protected $useTimestamps = true;
 
     public function getUser($userid = false, $where = 'default')

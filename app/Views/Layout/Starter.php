@@ -216,7 +216,8 @@ if ($loggedIn && (!isset($user) || !is_object($user))) {
             <?php endif; ?>
             <div class="lx-navgroup" style="margin-top:auto">
                 <div class="lx-navlabel">Tài khoản</div>
-                <a class="lx-navitem <?= $isActive('settings') ?>" href="<?= site_url('settings') ?>"><i class="bi bi-gear"></i> Settings</a>
+                <a class="lx-navitem <?= $isActive('settings/api') ?>" href="<?= site_url('settings/api') ?>"><i class="bi bi-hdd-network"></i> API Token</a>
+                <a class="lx-navitem <?= (strpos($curPath,'settings')!==false && strpos($curPath,'settings/api')===false)?'active':'' ?>" href="<?= site_url('settings') ?>"><i class="bi bi-gear"></i> Settings</a>
                 <a class="lx-navitem danger" href="<?= site_url('logout') ?>"><i class="bi bi-box-arrow-left"></i> Logout</a>
             </div>
         </aside>

@@ -38,6 +38,10 @@ $routes->match(['get', 'post'], '/', 'Auth::login');
 $routes->match(['get', 'post'], 'login', 'Auth::login');
 $routes->match(['get', 'post'], 'register', 'Auth::register');
 $routes->match(['get', 'post'], 'settings', 'User::settings');
+$routes->get('settings/api', 'ApiToken::index');
+$routes->get('settings/api/generate', 'ApiToken::generate');
+$routes->get('settings/api/toggle', 'ApiToken::toggle');
+$routes->get('settings/api/game/(:num)', 'ApiToken::toggleGame/$1');
 
 $routes->group('keys', function ($routes) {
 	$routes->match(['get', 'post'], '/', 'Keys::index');
@@ -64,6 +68,13 @@ $routes->group('admin', ['filter' => 'admin'], function ($routes) {
 });
 
 $routes->match(['get', 'post'], 'connect', 'Connect::index');
+
+/* ===== SELL API cho bot bán key bên ngoài (xác thực bằng api_token) ===== */
+$routes->group('api/sell', function ($routes) {
+	$routes->match(['get', 'post'], 'products', 'SellApi::products');
+	$routes->match(['get', 'post'], 'balance', 'SellApi::balance');
+	$routes->post('buy', 'SellApi::buy');
+});
 /*
  * --------------------------------------------------------------------
  * Additional Routing

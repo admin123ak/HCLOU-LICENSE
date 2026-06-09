@@ -85,6 +85,37 @@ $migrations = [
           1,0,NOW(),NOW()
         WHERE NOT EXISTS (SELECT 1 FROM `games` WHERE `game_code`='PUBG');
     ",
+    // ===== API TOKEN cho bot bán key bên ngoài =====
+    'Bảng pool key bán sẵn (tuỳ chọn)' => "
+        CREATE TABLE IF NOT EXISTS `keys_pool` (
+          `id_pool` INT(11) NOT NULL AUTO_INCREMENT,
+          `game_code` VARCHAR(32) NOT NULL,
+          `duration` INT(11) NOT NULL,
+          `max_devices` INT(11) DEFAULT 1,
+          `user_key` VARCHAR(32) NOT NULL,
+          `status` TINYINT(1) DEFAULT 1,
+          `is_sold` TINYINT(1) DEFAULT 0,
+          `created_at` DATETIME DEFAULT NULL,
+          PRIMARY KEY (`id_pool`),
+          KEY `idx_pool_pick` (`game_code`,`duration`,`is_sold`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+    ",
+    'Bảng log giao dịch API' => "
+        CREATE TABLE IF NOT EXISTS `api_logs` (
+          `id_log` INT(11) NOT NULL AUTO_INCREMENT,
+          `user_id` INT(11) DEFAULT NULL,
+          `action` VARCHAR(32) DEFAULT NULL,
+          `game_code` VARCHAR(32) DEFAULT NULL,
+          `duration` INT(11) DEFAULT NULL,
+          `price` DECIMAL(12,2) DEFAULT 0,
+          `user_key` VARCHAR(32) DEFAULT NULL,
+          `ip` VARCHAR(45) DEFAULT NULL,
+          `result` VARCHAR(16) DEFAULT NULL,
+          `created_at` DATETIME DEFAULT NULL,
+          PRIMARY KEY (`id_log`),
+          KEY `idx_log_user` (`user_id`,`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+    ",
 ];
 
 echo '<div class="box">';
@@ -96,6 +127,31 @@ foreach ($migrations as $label => $sql) {
     } catch (Throwable $e) {
         $ok = false;
         echo '<div class="err">❌ ' . htmlspecialchars($label) . ' — ' . htmlspecialchars($e->getMessage()) . '</div>';
+    }
+}
+
+// ---- ADD COLUMN an toàn (check tồn tại trước -> tương thích mọi MySQL) ----
+function addColIfMissing($pdo, $db, $table, $col, $definition) {
+    $st = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND COLUMN_NAME=?");
+    $st->execute([$db, $table, $col]);
+    if ((int)$st->fetchColumn() === 0) {
+        $pdo->exec("ALTER TABLE `$table` ADD COLUMN `$col` $definition");
+        return true;
+    }
+    return false;
+}
+$extraCols = [
+    ['users', 'api_token',   'VARCHAR(64) DEFAULT NULL'],
+    ['users', 'api_enabled', 'TINYINT(1) DEFAULT 0'],
+    ['games', 'api_sale',    'TINYINT(1) DEFAULT 1'],
+];
+foreach ($extraCols as $c) {
+    try {
+        $added = addColIfMissing($pdo, $DB_NAME, $c[0], $c[1], $c[2]);
+        echo '<div class="ok">✅ Cột ' . $c[0] . '.' . $c[1] . ($added ? ' (đã thêm)' : ' (đã có)') . '</div>';
+    } catch (Throwable $e) {
+        echo '<div class="err">❌ Cột ' . $c[0] . '.' . $c[1] . ' — ' . htmlspecialchars($e->getMessage()) . '</div>';
     }
 }
 echo '</div>';
