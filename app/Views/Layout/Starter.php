@@ -229,7 +229,7 @@ if ($loggedIn && (!isset($user) || !is_object($user))) {
                 <a class="lx-navitem <?= $active(['admin/create-referral']) ?>" href="<?= site_url('admin/create-referral') ?>"><i class="bi bi-person-plus"></i> Referral</a>
             </div>
             <?php endif; ?>
-            <div class="lx-navgroup" style="margin-top:auto">
+            <div class="lx-navgroup">
                 <div class="lx-navlabel">Tài khoản</div>
                 <a class="lx-navitem <?= $active(['settings/api']) ?>" href="<?= site_url('settings/api') ?>"><i class="bi bi-hdd-network"></i> API Token</a>
                 <a class="lx-navitem <?= ($curPath === 'settings') ? 'active' : '' ?>" href="<?= site_url('settings') ?>"><i class="bi bi-gear"></i> Cài đặt</a>
