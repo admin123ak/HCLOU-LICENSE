@@ -2,12 +2,11 @@
 
 <?= $this->section('content') ?>
 
-<div class="row justify-content-center pt-5">
-    <div class="col-lg-4">
+<div style="width:420px;max-width:100%">
         <?= $this->include('Layout/msgStatus') ?>
-        <div class="card shadow-sm mb-5">
-            <div class="card-header h5 p-3">
-                Login
+        <div class="card shadow-sm mb-3">
+            <div class="card-header">
+                <i class="bi bi-box-arrow-in-right"></i> Đăng nhập
             </div>
             <div class="card-body">
                 <?= form_open() ?>
@@ -31,25 +30,18 @@
                         Stay login?
                     </label>
                 </div>
-                <div class="form-group mb-2">
-                    <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-in-right"></i> Log in</button>
+                <div class="form-group mb-2 d-grid">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-box-arrow-in-right"></i> Đăng nhập</button>
                 </div>
                 <?= form_close() ?>
             </div>
         </div>
-        <p class="text-center text-white after-card">
-            <small class="bg-White px-auto p-2 rounded">
-                  PANEL ALMAK İÇİN DM :-
-            <a href="https://t.me/trexa_pm" class="text-white">@trexa_pm</a>
-            </small>
-            </p>
-         <p class="text-center text-white after-card">
-            <small class="bg-White px-auto p-2 rounded">
-                Don't have an account yet?
-                <a href="<?= site_url('register') ?>" class="text-white">Register here</a>
+        <p class="text-center after-card">
+            <small>
+                Chưa có tài khoản?
+                <a href="<?= site_url('register') ?>">Đăng ký tại đây</a>
             </small>
         </p>
-    </div>
 </div>
 
 <?= $this->endSection() ?>
