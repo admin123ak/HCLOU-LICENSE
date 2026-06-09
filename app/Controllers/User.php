@@ -21,12 +21,34 @@ class User extends BaseController
 
     public function index()
     {
-        $historyModel = new HistoryModel();
+        $user = $this->user;
+        $db = \Config\Database::connect();
+
+        // Thống kê key: admin thấy toàn bộ, reseller chỉ key mình tạo
+        $whereOwn = ((int)$user->level != 1) ? ['registrator' => $user->username] : [];
+
+        $countKeys = function ($extra = []) use ($db, $whereOwn) {
+            $b = $db->table('keys_code');
+            if ($whereOwn) $b->where($whereOwn);
+            foreach ($extra as $k => $v) {
+                if (is_int($k)) $b->where($v, null, false);
+                else $b->where($k, $v);
+            }
+            return (int) $b->countAllResults();
+        };
+
+        $stat = [
+            'total'   => $countKeys(),
+            'active'  => $countKeys(['status' => 1]),
+            'blocked' => $countKeys(['status' => 0]),
+            'expired' => $countKeys(['expired_date IS NOT NULL', 'expired_date < ' . $db->escape(date('Y-m-d H:i:s'))]),
+        ];
+
         $data = [
             'title' => 'Dashboard',
-            'user' => $this->user,
+            'user' => $user,
             'time' => $this->time,
-            'history' => $historyModel->getAll(),
+            'stat' => $stat,
         ];
         return view('User/dashboard', $data);
     }
