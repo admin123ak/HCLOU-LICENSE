@@ -80,5 +80,5 @@ defined('EXIT__AUTO_MAX')      || define('EXIT__AUTO_MAX', 125); // highest auto
 
 /* ------------------------ My base website constant start ------------------------ */
 
-define('BASE_NAME', 'TREXA HACK ');
-define('BASE_NAME_FULL', 'TREXA HACK ');
+define('BASE_NAME', 'HCLOU');
+define('BASE_NAME_FULL', 'HCLOU LICENSE');

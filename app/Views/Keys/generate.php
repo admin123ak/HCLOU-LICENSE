@@ -20,7 +20,7 @@
             </div>
         <?php endif; ?>
         <div class="card">
-            <div class="card-header p3"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);" text-white">
+            <div class="card-header p3" text-white">
                 <div class="row">
                     <div class="col pt-1">
                         Create License

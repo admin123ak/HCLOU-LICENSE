@@ -7,7 +7,7 @@
             <strong>INFO</strong> &middot; Search specify user by their (username, fullname, saldo or uplink).
         </div>
         <div class="card shadow-sm">
-            <div class="card-header"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);" text-white h6 p-3">
+            <div class="card-header" text-white h6 p-3">
                 Manage <?= $title ?>
             </div>
             <div class="card-body">
@@ -93,7 +93,7 @@
                 {
                     data: null,
                     render: function(data, type, row, meta) {
-                        return `<a href="${window.location.origin}/admin/user/${row.id}" class="btn btn-"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);" btn-sm">EDIT</a>`;
+                        return `<a href="${window.location.origin}/admin/user/${row.id}" class="btn btn-" btn-sm">EDIT</a>`;
                     }
                 }
             ]

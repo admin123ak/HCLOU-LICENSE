@@ -1,8 +1,7 @@
 <header>
-    <header>
-    <nav class="navbar navbar-expand-md navbar-dark bg-dark shadow-sm align-middle" role="alert" style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);">
+    <nav class="navbar navbar-expand-md navbar-dark shadow-sm align-middle">
         <div class="container px-3">
-            <a class="navbar-brand" href="<?= site_url() ?>"><i class="bi bi-slack"></i><?= BASE_NAME ?></a>
+            <a class="navbar-brand" href="<?= site_url() ?>"><i class="bi bi-shield-lock-fill"></i> <?= BASE_NAME ?></a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>

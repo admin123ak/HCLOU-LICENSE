@@ -9,7 +9,7 @@
 
     <div class="col-lg-8">
         <div class="card mb-3">
-            <div class="card-header text-white"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);">
+            <div class="card-header text-white">
                 Registration History
             </div>
             <div class="card-body">
@@ -35,7 +35,7 @@
     </div>
     <div class="col-lg-4">
         <div class="card mb-3">
-            <div class="card-header text-center text-white"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);">
+            <div class="card-header text-center text-white">
                 Information
             </div>
             <div class="card-body">

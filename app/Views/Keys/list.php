@@ -8,7 +8,7 @@
         </div>
         <div class="col-lg-12">
             <div class="card shadow-sm">
-                <div class="card-header"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);" text-white">
+                <div class="card-header" text-white">
                     <div class="row">
                         <div class="col pt-1">
                             Keys Registered

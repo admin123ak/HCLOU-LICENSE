@@ -22,7 +22,7 @@
     <?= $this->include('Layout/Header') ?>
     <!-- End of menu -->
     <main>
-        <div class="container p-6 py-4 mb-2"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);">
+        <div class="container p-6 py-4 mb-2">
             <!-- Start content -->
             <?= $this->renderSection('content') ?>
 

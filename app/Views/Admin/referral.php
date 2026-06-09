@@ -7,7 +7,7 @@
     </div>
     <div class="col-lg-4 mb-3">
         <div class="card">
-            <div class="card-header"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);" text-white p-3">
+            <div class="card-header" text-white p-3">
                 Generate <?= $title ?>
             </div>
             <div class="card-body">
@@ -24,7 +24,7 @@
                     <?php endif; ?>
                 </div>
                 <div class="form-group">
-                    <button type="submit" class="btn btn-"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);">Create Code</button>
+                    <button type="submit" class="btn btn-">Create Code</button>
                 </div>
                 <?= form_close() ?>
             </div>
@@ -33,7 +33,7 @@
     <div class="col-lg-8">
         <?php if ($code) : ?>
             <div class="card">
-                <div class="card-header"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);" text-white p-3">
+                <div class="card-header" text-white p-3">
                     History Generate - Total <?= $total_code ?>
                 </div>
                 <div class="card-body">

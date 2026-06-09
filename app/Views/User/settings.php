@@ -8,7 +8,7 @@
     </div>
     <div class="col-lg-6">
         <div class="card mb-3">
-            <div class="card-header h6 p-3"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);" text-white">
+            <div class="card-header h6 p-3" text-white">
                 Change Password
             </div>
             <div class="card-body">
@@ -37,7 +37,7 @@
                     <?php endif; ?>
                 </div>
                 <div class="form-group my-2">
-                    <button type="submit" class="btn btn-"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);"">Change Password</button>
+                    <button type="submit" class="btn btn-"">Change Password</button>
                 </div>
                 <?= form_close() ?>
             </div>
@@ -45,7 +45,7 @@
     </div>
     <div class="col-lg-6">
         <div class="card mb-3">
-            <div class="card-header h6 p-3"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);" text-white">
+            <div class="card-header h6 p-3" text-white">
                 Accont Information
             </div>
             <div class="card-body">
@@ -60,7 +60,7 @@
                     <?php endif; ?>
                 </div>
                 <div class="form-group my-2">
-                    <button type="submit" class="btn btn-"style="background: linear-gradient(0.9turn, #FF00FF88, #25383C, #307D7E);">Update Account</button>
+                    <button type="submit" class="btn btn-">Update Account</button>
                 </div>
                 <?= form_close() ?>
             </div>
