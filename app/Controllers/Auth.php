@@ -17,9 +17,8 @@ class Auth extends BaseController
 
     public function index()
     {
-        /* ---------------------------- Debugmode --------------------------- */
-        $a = $this->userModel->getUser(session('userid'));
-        dd($a, session());
+        // Debug cũ (dd session) đã bị gỡ vì lộ thông tin. Chuyển hướng an toàn.
+        return redirect()->to(session()->has('userid') ? 'dashboard' : 'login');
     }
 
     public function login()
@@ -53,15 +52,6 @@ class Auth extends BaseController
 
     private function login_action()
     {
-        // ===== CHỐNG BRUTE-FORCE: tối đa 8 lần thử / 10 phút theo IP =====
-        $throttler = \Config\Services::throttler();
-        $key = 'login_' . md5($this->request->getIPAddress());
-        if ($throttler->check($key, 8, MINUTE * 10) === false) {
-            $wait = (int) $throttler->getTokenTime();
-            return redirect()->route('login')->withInput()
-                ->with('msgDanger', 'Quá nhiều lần đăng nhập sai. Vui lòng thử lại sau ' . $wait . ' giây.');
-        }
-
         $username = $this->request->getPost('username');
         $password = $this->request->getPost('password');
         $stay_log = $this->request->getPost('stay_log');

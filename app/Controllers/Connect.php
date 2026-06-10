@@ -12,7 +12,9 @@ class Connect extends BaseController
     {
         $this->model = new KeysModel();
         $this->maintenance = false;
-        $this->staticWords = "Vm8Lk7Uj2JmsjCPVPVjrLa7zgfx3uz9E";
+        // Bí mật ký token: ưu tiên đọc từ .env (connect.secret). Fallback giá trị cũ
+        // để không phá app đang chạy. NÊN đặt giá trị MỚI trong .env + để repo PRIVATE.
+        $this->staticWords = env('connect.secret') ?: "Vm8Lk7Uj2JmsjCPVPVjrLa7zgfx3uz9E";
     }
 
     /** Kiểm tra bảng games đã tồn tại chưa (tương thích panel chưa import) */
@@ -47,6 +49,15 @@ class Connect extends BaseController
 
     public function index_post()
     {
+        // Rate limit chống dò/brute key: tối đa 60 lần/phút theo IP
+        $throttler = \Config\Services::throttler();
+        if ($throttler->check(md5('connect_' . $this->request->getIPAddress()), 60, MINUTE) === false) {
+            return $this->response->setStatusCode(429)->setJSON([
+                'status' => false,
+                'reason' => 'TOO MANY REQUESTS'
+            ]);
+        }
+
         $isMT = $this->maintenance;
         $game = $this->request->getPost('game');
         $uKey = $this->request->getPost('user_key');
