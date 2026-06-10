@@ -52,8 +52,74 @@ class Connect extends BaseController
         return base64_encode($sig);
     }
 
+    /** Bí mật mã hoá request (đối xứng). Đặt connect.apiSecret trong .env. */
+    private function apiSecret()
+    {
+        return env('connect.apiSecret') ?: $this->staticWords;
+    }
+
+    /** Khoá AES phiên (32 byte) suy từ secret + timestamp. */
+    private function sessionKey($ts)
+    {
+        return hash('sha256', $this->apiSecret() . '|' . $ts, true);
+    }
+
+    /** Khoá HMAC suy từ secret + nonce. */
+    private function macKey($nonce)
+    {
+        return hash('sha256', $this->apiSecret() . '|' . $nonce . '|mac', true);
+    }
+
+    /**
+     * Giải mã request mã hoá. Trả ['game','key','hwid'] hoặc null (set $err).
+     * Client gửi: d (base64 iv+ciphertext AES-256-CBC), t (ts), n (nonce), m (HMAC base64).
+     */
+    private function decryptRequest(&$err)
+    {
+        $req = $this->request;
+        $d = (string) $req->getPost('d');
+        $t = (string) $req->getPost('t');
+        $n = (string) $req->getPost('n');
+        $m = (string) $req->getPost('m');
+        if ($d === '' || $t === '' || $n === '' || $m === '') { $err = 'BAD_ENC_FORMAT'; return null; }
+
+        // Chống replay: timestamp lệch tối đa 300s
+        if (abs(time() - (int) $t) > 300) { $err = 'REQUEST_EXPIRED'; return null; }
+
+        // Verify HMAC (chống sửa request)
+        $expectMac = base64_encode(hash_hmac('sha256', $d . '|' . $t . '|' . $n, $this->macKey($n), true));
+        if (!hash_equals($expectMac, $m)) { $err = 'BAD_MAC'; return null; }
+
+        // Giải mã AES-256-CBC
+        $raw = base64_decode($d, true);
+        if ($raw === false || strlen($raw) <= 16) { $err = 'BAD_CIPHER'; return null; }
+        $iv = substr($raw, 0, 16);
+        $ct = substr($raw, 16);
+        $plain = openssl_decrypt($ct, 'aes-256-cbc', $this->sessionKey($t), OPENSSL_RAW_DATA, $iv);
+        if ($plain === false) { $err = 'DECRYPT_FAIL'; return null; }
+
+        $obj = json_decode($plain, true);
+        if (!is_array($obj)) { $err = 'BAD_JSON'; return null; }
+        return $obj;
+    }
+
+    /** Chặn xem endpoint qua trình duyệt (cần header X-API-Client). */
+    private function isBrowserDirect()
+    {
+        $ua = $this->request->getServer('HTTP_USER_AGENT') ?? '';
+        $hasClient = $this->request->getHeaderLine('X-API-Client') !== '';
+        return (preg_match('/(Mozilla|Chrome|Safari|Firefox|Edge|Opera)/i', $ua) && !$hasClient);
+    }
+
     public function index()
     {
+        // Chặn truy cập trực tiếp bằng trình duyệt (như Kuro)
+        if ($this->isBrowserDirect()) {
+            return $this->response->setStatusCode(403)->setBody(
+                '<!doctype html><html><head><title>Access Denied</title><style>body{background:#0d1117;color:#c9d1d9;font-family:sans-serif;display:flex;height:100vh;align-items:center;justify-content:center;margin:0}div{text-align:center}</style></head><body><div><h1>403</h1><p>This endpoint is for the app client only.</p></div></body></html>'
+            );
+        }
+
         if ($this->request->getPost()) {
             return $this->index_post();
         } else {
@@ -84,22 +150,30 @@ class Connect extends BaseController
         }
 
         $isMT = $this->maintenance;
-        $game = $this->request->getPost('game');
-        $uKey = $this->request->getPost('user_key');
-        $sDev = $this->request->getPost('serial');
 
-        $form_rules = [
-            'game' => 'required|alpha_dash',
-            'user_key' => 'required|alpha_numeric|min_length[1]|max_length[36]',
-            'serial' => 'required|alpha_dash'
-        ];
+        // === Request MÃ HOÁ (AES-256 + HMAC + timestamp + nonce) — như Kuro ===
+        // App mới gửi field 'd' (ciphertext). App cũ vẫn gửi game/user_key/serial plaintext.
+        $encField = $this->request->getPost('d');
+        if ($encField !== null && $encField !== '') {
+            $dec = $this->decryptRequest($encErr);
+            if ($dec === null) {
+                return $this->response->setJSON(['status' => false, 'reason' => $encErr]);
+            }
+            $game = $dec['game'] ?? null;
+            $uKey = $dec['key']  ?? null;
+            $sDev = $dec['hwid'] ?? null;
+        } else {
+            $game = $this->request->getPost('game');
+            $uKey = $this->request->getPost('user_key');
+            $sDev = $this->request->getPost('serial'); // serial = HWID
+        }
 
-        if (!$this->validate($form_rules)) {
-            $data = [
-                'status' => false,
-                'reason' => "Bad Parameter",
-            ];
-            return $this->response->setJSON($data);
+        // Validate thủ công (áp dụng cho cả 2 path)
+        if (!$game || !$uKey || !$sDev
+            || !preg_match('/^[A-Za-z0-9_-]{1,32}$/', (string)$game)
+            || !preg_match('/^[A-Za-z0-9]{1,36}$/', (string)$uKey)
+            || !preg_match('/^[A-Za-z0-9_-]{1,128}$/', (string)$sDev)) {
+            return $this->response->setJSON(['status' => false, 'reason' => 'Bad Parameter']);
         }
 
         if ($isMT) {
