@@ -48,7 +48,7 @@ class Games extends BaseController
 
         // Validate cơ bản
         if ($name === '' || $code === '' || !preg_match('/^[A-Z0-9_]{2,32}$/', $code)) {
-            return redirect()->to('admin/games')->with('msgDanger', 'Tên game / mã game không hợp lệ (mã: CHỮ HOA, số, _ ; 2-32 ký tự).');
+            return redirect()->to('admin/games')->with('msgDanger', 'Invalid game name / code (code: UPPERCASE, digits, _ ; 2-32 chars).');
         }
 
         // Build durations JSON từ các dòng gói
@@ -61,7 +61,7 @@ class Games extends BaseController
             }
         }
         if (empty($durations)) {
-            return redirect()->to('admin/games')->with('msgDanger', 'Phải có ít nhất 1 gói (số giờ + giá).');
+            return redirect()->to('admin/games')->with('msgDanger', 'At least 1 package required (hours + price).');
         }
 
         $payload = [
@@ -76,17 +76,17 @@ class Games extends BaseController
             if ($id > 0) {
                 // Sửa — không cho trùng game_code với game khác
                 $dup = $this->model->where('game_code', $code)->where('id_game !=', $id)->first();
-                if ($dup) return redirect()->to('admin/games')->with('msgDanger', 'Mã game đã tồn tại.');
+                if ($dup) return redirect()->to('admin/games')->with('msgDanger', 'Game code already exists.');
                 $this->model->update($id, $payload);
-                $msg = 'Đã cập nhật game "' . $name . '".';
+                $msg = 'Game "' . $name . '" updated.';
             } else {
                 $dup = $this->model->where('game_code', $code)->first();
-                if ($dup) return redirect()->to('admin/games')->with('msgDanger', 'Mã game đã tồn tại.');
+                if ($dup) return redirect()->to('admin/games')->with('msgDanger', 'Game code already exists.');
                 $this->model->insert($payload);
-                $msg = 'Đã thêm game "' . $name . '".';
+                $msg = 'Game "' . $name . '" added.';
             }
         } catch (\Throwable $e) {
-            return redirect()->to('admin/games')->with('msgDanger', 'Lỗi DB: ' . $e->getMessage());
+            return redirect()->to('admin/games')->with('msgDanger', 'DB error: ' . $e->getMessage());
         }
 
         return redirect()->to('admin/games')->with('msgSuccess', $msg);
@@ -97,8 +97,8 @@ class Games extends BaseController
         $id = (int) $this->request->getPost('id_game');
         if ($id > 0) {
             $this->model->delete($id);
-            return redirect()->to('admin/games')->with('msgSuccess', 'Đã xoá game.');
+            return redirect()->to('admin/games')->with('msgSuccess', 'Game deleted.');
         }
-        return redirect()->to('admin/games')->with('msgDanger', 'Không tìm thấy game.');
+        return redirect()->to('admin/games')->with('msgDanger', 'Game not found.');
     }
 }

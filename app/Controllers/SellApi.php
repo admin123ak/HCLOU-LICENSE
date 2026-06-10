@@ -249,7 +249,7 @@ class SellApi extends Controller
                 'reason'    => 'DURATION_NOT_FOUND',
                 'sent'      => $duration,
                 'available' => array_keys($priceMap), // các duration (giờ) hợp lệ của game này
-                'hint'      => 'Sửa gói: api_duration phải là 1 trong các giá trị (giờ) này. 1 ngày=24, 1 tháng=720.',
+                'hint'      => 'Fix package: api_duration must be one of these (hours) values. 1 day=24, 1 month=720.',
             ], 404);
         }
         $price = (float) $priceMap[$duration] * $maxDev;

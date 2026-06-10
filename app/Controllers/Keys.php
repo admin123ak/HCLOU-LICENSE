@@ -103,15 +103,15 @@ class Keys extends BaseController
         $dKey = $this->model->getKeys($id, 'id_keys');
         $user = $this->user;
         if (!$dKey) {
-            return redirect()->to('keys')->with('msgDanger', 'Key không tồn tại.');
+            return redirect()->to('keys')->with('msgDanger', 'Key not found.');
         }
         if ($user->level == 1 || $dKey->registrator == $user->username) {
             $new = ((int) $dKey->status === 1) ? 0 : 1;
             $this->model->update($id, ['status' => $new]);
-            $msg = $new ? 'Đã MỞ key.' : 'Đã KHOÁ key.';
+            $msg = $new ? 'Key unlocked.' : 'Key locked.';
             return redirect()->to('keys')->with('msgSuccess', $msg);
         }
-        return redirect()->to('keys')->with('msgDanger', 'Bạn không có quyền với key này.');
+        return redirect()->to('keys')->with('msgDanger', 'You do not have permission for this key.');
     }
 
     public function edit_key($key = false)
