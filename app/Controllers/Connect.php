@@ -144,20 +144,12 @@ class Connect extends BaseController
 
         if ($this->request->getPost()) {
             return $this->index_post();
-        } else {
-            $nata = [
-                "web_info" => [
-                    "_client" => BASE_NAME,
-                    "license" => "Qp5KSGTquetnUkjX6UVBAURH8hTkZuLM",
-                    "version" => "1.0.0",
-                ],
-                "web__dev" => [
-                    "author" => "DhuvadHeet",
-                ],
-            ];
-
-            return $this->response->setJSON($nata);
         }
+        // GET: KHÔNG lộ license/version/author. Chỉ trả tối thiểu.
+        return $this->response->setStatusCode(405)->setJSON([
+            'status' => false,
+            'reason' => 'METHOD_NOT_ALLOWED'
+        ]);
     }
 
     public function index_post()
