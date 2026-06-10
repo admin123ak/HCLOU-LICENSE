@@ -63,7 +63,10 @@
   <div class="card-header"><i class="bi bi-android2"></i> Android code (Java) — encrypted request + RSA verify</div>
   <div class="card-body">
     <div class="alert" style="background:rgba(99,102,241,.1);font-size:12.5px;color:#c7d2fe">
-      🔐 Protection layers (stronger than Kuro): <b>AES-256 encrypted request</b> + <b>HMAC-SHA256</b> + <b>timestamp/nonce anti-replay</b> + <b>browser block</b> + <b>RSA-signed response</b>. Call <code>HclouLicense.verify(game, key, hwid)</code> on a background thread.
+      🔐 Protection layers (stronger than Kuro): <b>AES-256 encrypted request</b> + <b>HMAC-SHA256</b> + <b>timestamp/nonce anti-replay</b> + <b>RSA-signed response</b>.
+    </div>
+    <div class="alert" style="background:rgba(251,191,36,.12);font-size:12.5px;color:#fcd34d">
+      📌 <b>App native (.so / C++ / mod menu)?</b> → KHÔNG dùng code Java này. Dùng file <code>client_sdk/main_secure.cpp</code> trong repo (dán đè <code>main.cpp</code> cũ). Code Java dưới chỉ cho app Java thuần.
     </div>
     <?php if (!$currentPublic): ?>
       <div class="alert alert-warning" style="font-size:12.5px">⚠️ RSA not configured yet: <code>PUBLIC_KEY</code> is empty → the app still <b>runs</b> (encryption + HMAC already active). Generate a key + paste into <code>.env</code>, then copy this code again to enable RSA response verification.</div>
