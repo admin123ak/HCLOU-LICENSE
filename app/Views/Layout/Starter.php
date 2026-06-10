@@ -227,6 +227,7 @@ if ($loggedIn && (!isset($user) || !is_object($user))) {
                 <a class="lx-navitem <?= $active(['admin/games']) ?>" href="<?= site_url('admin/games') ?>"><i class="bi bi-controller"></i> Games</a>
                 <a class="lx-navitem <?= $active(['admin/manage-users','admin/user']) ?>" href="<?= site_url('admin/manage-users') ?>"><i class="bi bi-people"></i> Quản lý Users</a>
                 <a class="lx-navitem <?= $active(['admin/create-referral']) ?>" href="<?= site_url('admin/create-referral') ?>"><i class="bi bi-person-plus"></i> Referral</a>
+                <a class="lx-navitem <?= $active(['settings/sdk']) ?>" href="<?= site_url('settings/sdk') ?>"><i class="bi bi-shield-lock"></i> License SDK</a>
             </div>
             <?php endif; ?>
             <div class="lx-navgroup">

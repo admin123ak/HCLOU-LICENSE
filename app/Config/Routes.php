@@ -41,6 +41,7 @@ $routes->get('settings/api', 'ApiToken::index');
 $routes->get('settings/api/generate', 'ApiToken::generate');
 $routes->get('settings/api/toggle', 'ApiToken::toggle');
 $routes->get('settings/api/game/(:num)', 'ApiToken::toggleGame/$1');
+$routes->get('settings/sdk', 'ApiToken::sdk');
 
 $routes->group('keys', function ($routes) {
 	$routes->match(['get', 'post'], '/', 'Keys::index');

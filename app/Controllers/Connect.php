@@ -27,6 +27,31 @@ class Connect extends BaseController
         }
     }
 
+    /**
+     * Lấy private key RSA (PEM) từ .env (connect.rsaPrivate = base64 của PEM).
+     * Để repo có public mà private vẫn KHÔNG nằm trong source.
+     */
+    private function rsaPrivatePem()
+    {
+        $b64 = env('connect.rsaPrivate');
+        if (!$b64) return null;
+        $pem = base64_decode($b64, true);
+        return $pem ?: null;
+    }
+
+    /** Ký payload bằng RSA private key (SHA256). Trả base64, hoặc null nếu chưa cấu hình. */
+    private function signRSA($payload)
+    {
+        if (!function_exists('openssl_sign')) return null;
+        $pem = $this->rsaPrivatePem();
+        if (!$pem) return null;
+        $pkey = openssl_pkey_get_private($pem);
+        if (!$pkey) return null;
+        $sig = '';
+        if (!openssl_sign($payload, $sig, $pkey, OPENSSL_ALGO_SHA256)) return null;
+        return base64_encode($sig);
+    }
+
     public function index()
     {
         if ($this->request->getPost()) {
@@ -178,13 +203,19 @@ class Connect extends BaseController
                                     $model->update($id_keys, $devicesAdd);
                                 }
                                 // ? game-user_key-serial-word di line 15
+                                $ts = $time->getTimestamp();
                                 $real = "$game-$uKey-$sDev-$this->staticWords";
+                                // payload để app verify bằng RSA public key (chống giả mạo token)
+                                $payload = "$game|$uKey|$sDev|$ts";
                                 $data = [
                                     'status' => true,
                                     'data' => [
-                                        // 'real' => $real,
+                                        // token md5 CŨ: giữ tạm cho app cũ. BỎ sau khi app dùng RSA.
                                         'token' => md5($real),
-                                        'rng' => $time->getTimestamp()
+                                        // === RSA (mới) — app verify chữ ký bằng PUBLIC key ===
+                                        'payload' => $payload,
+                                        'sig'     => $this->signRSA($payload),
+                                        'rng' => $ts
                                     ],
                                 ];
                             } else {

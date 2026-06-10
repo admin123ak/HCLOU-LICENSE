@@ -45,6 +45,43 @@ class ApiToken extends BaseController
         ]);
     }
 
+    /**
+     * Trang SDK chống crack: hiển thị public key RSA + code Android dán-là-chạy.
+     * ?gen=1 -> tạo cặp khoá mới (admin tự dán private vào .env).
+     */
+    public function sdk()
+    {
+        if ((int)$this->user->level !== 1) return redirect()->to('dashboard');
+
+        // Tạo cặp khoá mới khi bấm nút
+        $generated = null;
+        if ($this->request->getGet('gen') === '1' && function_exists('openssl_pkey_new')) {
+            $res = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+            if ($res) {
+                openssl_pkey_export($res, $priv);
+                $det = openssl_pkey_get_details($res);
+                $generated = ['private_b64' => base64_encode($priv), 'public' => $det['key']];
+            }
+        }
+
+        // Public key hiện hành (suy từ private trong .env)
+        $currentPublic = null;
+        $b64 = env('connect.rsaPrivate');
+        if ($b64 && function_exists('openssl_pkey_get_private')) {
+            $pem = base64_decode($b64, true);
+            $pk  = $pem ? openssl_pkey_get_private($pem) : false;
+            if ($pk) { $d = openssl_pkey_get_details($pk); if ($d) $currentPublic = $d['key']; }
+        }
+
+        return view('User/sdk', [
+            'title'         => 'License SDK',
+            'user'          => $this->user,
+            'generated'     => $generated,
+            'currentPublic' => $currentPublic,
+            'connectUrl'    => rtrim(base_url('connect'), '/'),
+        ]);
+    }
+
     /** Tạo mới / làm mới token */
     public function generate()
     {
