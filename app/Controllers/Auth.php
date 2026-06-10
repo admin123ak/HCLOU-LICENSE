@@ -132,15 +132,15 @@ class Auth extends BaseController
         if (!$this->validate($form_rules)) {
             // Hiện lỗi cụ thể (username trùng / mật khẩu ngắn / referral...) thay vì generic
             $errs = implode(' ', $this->validator->getErrors());
-            return redirect()->route('register')->withInput()->with('msgDanger', $errs ?: 'Vui lòng kiểm tra lại thông tin.');
+            return redirect()->route('register')->withInput()->with('msgDanger', $errs ?: 'Please check your information.');
         } else {
             $mCode = new CodeModel();
             $rCheck = $mCode->checkCode($referral);
             if (!$rCheck) {
-                return redirect()->route('register')->withInput()->with('msgDanger', 'Sai mã referral hoặc mã không tồn tại.');
+                return redirect()->route('register')->withInput()->with('msgDanger', 'Invalid referral code or it does not exist.');
             }
             if ($rCheck->used_by) {
-                return redirect()->route('register')->withInput()->with('msgDanger', 'Mã referral đã được sử dụng bởi: ' . $rCheck->used_by);
+                return redirect()->route('register')->withInput()->with('msgDanger', 'Referral code already used by: ' . $rCheck->used_by);
             }
             $hashPassword = create_password($password);
             $data_register = [
@@ -152,10 +152,10 @@ class Auth extends BaseController
             $ids = $this->userModel->insert($data_register, true);
             if ($ids) {
                 $mCode->useReferral($referral, $username); // đánh dấu mã đã dùng (truyền username)
-                return redirect()->to('login')->with('msgSuccess', 'Đăng ký thành công! Mời đăng nhập.');
+                return redirect()->to('login')->with('msgSuccess', 'Registration successful! Please log in.');
             }
         }
-        return redirect()->route('register')->withInput()->with('msgDanger', 'Đăng ký thất bại, vui lòng thử lại.');
+        return redirect()->route('register')->withInput()->with('msgDanger', 'Registration failed, please try again.');
     }
 
     public function logout()

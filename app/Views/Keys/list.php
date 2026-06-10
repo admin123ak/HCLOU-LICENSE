@@ -9,8 +9,8 @@
         <div class="col-lg-12">
             <div class="card shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-key"></i> Danh sách Key</span>
-                    <a class="btn btn-primary btn-sm" href="<?= site_url('keys/generate') ?>"><i class="bi bi-plus-lg"></i> Tạo Key</a>
+                    <span><i class="bi bi-key"></i> Key List</span>
+                    <a class="btn btn-primary btn-sm" href="<?= site_url('keys/generate') ?>"><i class="bi bi-plus-lg"></i> Create Key</a>
                 </div>
                 <div class="card-body">
                     <?php if ($keylist) : ?>
@@ -21,11 +21,11 @@
                                         <th>#</th>
                                         <th>Game</th>
                                         <th>License Key</th>
-                                        <th>Thiết bị</th>
-                                        <th>Gói</th>
-                                        <th>Hết hạn</th>
-                                        <th>Trạng thái</th>
-                                        <th class="text-end">Thao tác</th>
+                                        <th>Devices</th>
+                                        <th>Package</th>
+                                        <th>Expires</th>
+                                        <th>Status</th>
+                                        <th class="text-end">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -40,7 +40,7 @@
                                         <td class="text-muted"><?= $k['id_keys'] ?></td>
                                         <td><span class="badge" style="background:rgba(99,102,241,.16);color:#c7d2fe;border:1px solid rgba(99,102,241,.3)"><?= esc($k['game']) ?></span></td>
                                         <td>
-                                            <span class="<?= $isActive?'text-success':'text-danger' ?>" style="font-family:monospace;font-weight:700;cursor:pointer" onclick="copyKey('<?= esc($k['user_key']) ?>')" title="Bấm để copy"><?= esc($k['user_key']) ?> <i class="bi bi-clipboard" style="font-size:11px;opacity:.6"></i></span>
+                                            <span class="<?= $isActive?'text-success':'text-danger' ?>" style="font-family:monospace;font-weight:700;cursor:pointer" onclick="copyKey('<?= esc($k['user_key']) ?>')" title="Click to copy"><?= esc($k['user_key']) ?> <i class="bi bi-clipboard" style="font-size:11px;opacity:.6"></i></span>
                                         </td>
                                         <td><span id="devMax-<?= esc($k['user_key']) ?>" style="font-weight:700;color:#fff"><?= $devCount ?>/<?= (int)$k['max_devices'] ?></span></td>
                                         <td><span style="font-weight:700;color:#fcd34d"><?= (int)$k['duration'] ?>h</span></td>
@@ -48,22 +48,22 @@
                                             <?php if($expired): ?>
                                                 <span style="font-weight:700;color:<?= $isOver?'#fca5a5':'#6ee7b7' ?>"><?= $expTxt ?></span>
                                             <?php else: ?>
-                                                <span class="text-muted" style="font-style:italic">Chưa kích hoạt</span>
+                                                <span class="text-muted" style="font-style:italic">Not activated</span>
                                             <?php endif; ?>
                                         </td>
                                         <td>
                                             <?php if($isActive): ?>
                                                 <span class="badge" style="background:rgba(52,211,153,.14);color:#6ee7b7;border:1px solid rgba(52,211,153,.3)">● Active</span>
                                             <?php else: ?>
-                                                <span class="badge" style="background:rgba(248,113,113,.14);color:#fca5a5;border:1px solid rgba(248,113,113,.3)">🔒 Khoá</span>
+                                                <span class="badge" style="background:rgba(248,113,113,.14);color:#fca5a5;border:1px solid rgba(248,113,113,.3)">🔒 Locked</span>
                                             <?php endif; ?>
                                         </td>
                                         <td>
                                             <div class="d-flex gap-1 justify-content-end flex-nowrap">
-                                                <button type="button" class="btn btn-sm <?= $isActive?'btn-danger':'btn-success' ?>" title="<?= $isActive?'Khoá key':'Mở key' ?>"
+                                                <button type="button" class="btn btn-sm <?= $isActive?'btn-danger':'btn-success' ?>" title="<?= $isActive?'Lock key':'Unlock key' ?>"
                                                    onclick="toggleKey(<?= (int)$k['id_keys'] ?>, <?= $isActive?'true':'false' ?>, '<?= esc($k['user_key']) ?>')"><i class="bi bi-<?= $isActive?'lock-fill':'unlock-fill' ?>"></i></button>
-                                                <button type="button" class="btn btn-secondary btn-sm" onclick="resetUserKey('<?= esc($k['user_key']) ?>')" title="Reset thiết bị"><i class="bi bi-arrow-repeat"></i></button>
-                                                <a href="<?= site_url('keys/' . $k['id_keys']) ?>" class="btn btn-primary btn-sm" title="Sửa key"><i class="bi bi-pencil"></i></a>
+                                                <button type="button" class="btn btn-secondary btn-sm" onclick="resetUserKey('<?= esc($k['user_key']) ?>')" title="Reset devices"><i class="bi bi-arrow-repeat"></i></button>
+                                                <a href="<?= site_url('keys/' . $k['id_keys']) ?>" class="btn btn-primary btn-sm" title="Edit key"><i class="bi bi-pencil"></i></a>
                                             </div>
                                         </td>
                                     </tr>
@@ -112,21 +112,21 @@
     function copyKey(k){
         if(navigator.clipboard){ navigator.clipboard.writeText(k); }
         else { var t=document.createElement('textarea'); t.value=k; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
-        Toast.fire({ icon:'success', title:'Đã copy key!' });
+        Toast.fire({ icon:'success', title:'Key copied!' });
     }
 
     // Reset thiết bị của key
     function resetUserKey(keys) {
         Swal.fire(Object.assign({}, SW, {
-            title: 'Reset thiết bị?',
-            text: "Key này sẽ được gỡ khỏi tất cả thiết bị đã đăng nhập.",
+            title: 'Reset devices?',
+            text: "This key will be removed from all logged-in devices.",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: '<i class="bi bi-arrow-repeat"></i> Reset',
-            cancelButtonText: 'Huỷ'
+            cancelButtonText: 'Cancel'
         })).then(function(result) {
             if (!result.isConfirmed) return;
-            Swal.fire(Object.assign({}, SW, { title:'Đang xử lý...', didOpen:function(){Swal.showLoading();}, allowOutsideClick:false }));
+            Swal.fire(Object.assign({}, SW, { title:'Processing...', didOpen:function(){Swal.showLoading();}, allowOutsideClick:false }));
             $.ajax({
                 url: RESET_URL,
                 method: 'GET',
@@ -136,24 +136,24 @@
                 if (data && data.registered) {
                     if (data.reset) {
                         $('#devMax-' + keys).html('0/' + data.devices_max);
-                        Swal.fire(Object.assign({}, SW, { title:'Thành công!', text:'Đã reset thiết bị về 0.', icon:'success' }));
+                        Swal.fire(Object.assign({}, SW, { title:'Success!', text:'Devices reset to 0.', icon:'success' }));
                     } else {
                         Swal.fire(Object.assign({}, SW, {
-                            title: 'Không thể reset',
-                            text: data.devices_total ? 'Bạn không có quyền với key này.' : 'Key chưa có thiết bị nào để reset.',
+                            title: 'Cannot reset',
+                            text: data.devices_total ? 'You do not have permission for this key.' : 'This key has no devices to reset.',
                             icon: data.devices_total ? 'error' : 'info'
                         }));
                     }
                 } else {
-                    Swal.fire(Object.assign({}, SW, { title:'Lỗi', text:'Key không tồn tại.', icon:'error' }));
+                    Swal.fire(Object.assign({}, SW, { title:'Error', text:'Key not found.', icon:'error' }));
                 }
             }).fail(function(xhr){
-                var msg = 'Không gọi được server (mã '+xhr.status+').';
-                if (xhr.status === 0) msg = 'Không kết nối được tới: ' + RESET_URL + ' — kiểm tra baseURL / https.';
-                else if (xhr.status === 404) msg = 'Không tìm thấy route reset (404). Kiểm tra URL: ' + RESET_URL;
-                else if (xhr.status === 403) msg = 'Bị từ chối (403). Có thể chưa đăng nhập.';
+                var msg = 'Could not reach server (code '+xhr.status+').';
+                if (xhr.status === 0) msg = 'Cannot connect to: ' + RESET_URL + ' — check baseURL / https.';
+                else if (xhr.status === 404) msg = 'Reset route not found (404). Check URL: ' + RESET_URL;
+                else if (xhr.status === 403) msg = 'Forbidden (403). You may not be logged in.';
                 else if (xhr.responseText) msg += ' ' + String(xhr.responseText).substring(0,120);
-                Swal.fire(Object.assign({}, SW, { title:'Lỗi kết nối', text:msg, icon:'error' }));
+                Swal.fire(Object.assign({}, SW, { title:'Connection error', text:msg, icon:'error' }));
             });
         });
     }
@@ -161,12 +161,12 @@
     // Khoá / mở key
     function toggleKey(id, isActive, keyName) {
         Swal.fire(Object.assign({}, SW, {
-            title: isActive ? 'Khoá key này?' : 'Mở key này?',
-            text: isActive ? 'Người dùng sẽ không thể đăng nhập bằng key này.' : 'Key sẽ hoạt động trở lại.',
+            title: isActive ? 'Lock this key?' : 'Unlock this key?',
+            text: isActive ? 'The user will not be able to log in with this key.' : 'The key will work again.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: isActive ? '<i class="bi bi-lock-fill"></i> Khoá' : '<i class="bi bi-unlock-fill"></i> Mở',
-            cancelButtonText: 'Huỷ',
+            confirmButtonText: isActive ? '<i class="bi bi-lock-fill"></i> Lock' : '<i class="bi bi-unlock-fill"></i> Unlock',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: isActive ? '#dc2626' : '#10b981'
         })).then(function(result) {
             if (result.isConfirmed) {

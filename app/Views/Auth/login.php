@@ -6,7 +6,7 @@
         <?= $this->include('Layout/msgStatus') ?>
         <div class="card shadow-sm mb-3">
             <div class="card-header">
-                <i class="bi bi-box-arrow-in-right"></i> Đăng nhập
+                <i class="bi bi-box-arrow-in-right"></i> Login
             </div>
             <div class="card-body">
                 <?= form_open() ?>
@@ -31,15 +31,15 @@
                     </label>
                 </div>
                 <div class="form-group mb-2 d-grid">
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-box-arrow-in-right"></i> Đăng nhập</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-box-arrow-in-right"></i> Login</button>
                 </div>
                 <?= form_close() ?>
             </div>
         </div>
         <p class="text-center after-card">
             <small>
-                Chưa có tài khoản?
-                <a href="<?= site_url('register') ?>">Đăng ký tại đây</a>
+                Don't have an account?
+                <a href="<?= site_url('register') ?>">Register here</a>
             </small>
         </p>
 </div>

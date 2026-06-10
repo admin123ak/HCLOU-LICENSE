@@ -42,33 +42,33 @@
 <div class="dash-kpis">
     <div class="kpi" style="--c:#6366f1;--c2:#22d3ee">
         <div class="ico"><i class="bi bi-key-fill"></i></div>
-        <div><div class="num"><?= number_format($stat['total']) ?></div><div class="lbl">Tổng key đã tạo</div></div>
+        <div><div class="num"><?= number_format($stat['total']) ?></div><div class="lbl">Total keys created</div></div>
     </div>
     <div class="kpi" style="--c:#10b981;--c2:#34d399">
         <div class="ico"><i class="bi bi-check-circle-fill"></i></div>
-        <div><div class="num"><?= number_format($stat['active']) ?></div><div class="lbl">Key đang hoạt động</div></div>
+        <div><div class="num"><?= number_format($stat['active']) ?></div><div class="lbl">Active keys</div></div>
     </div>
     <div class="kpi" style="--c:#f43f5e;--c2:#fb7185">
         <div class="ico"><i class="bi bi-lock-fill"></i></div>
-        <div><div class="num"><?= number_format($stat['blocked']) ?></div><div class="lbl">Key bị khoá</div></div>
+        <div><div class="num"><?= number_format($stat['blocked']) ?></div><div class="lbl">Locked keys</div></div>
     </div>
     <div class="kpi" style="--c:#f59e0b;--c2:#fbbf24">
         <div class="ico"><i class="bi bi-clock-history"></i></div>
-        <div><div class="num"><?= number_format($stat['expired']) ?></div><div class="lbl">Key đã hết hạn</div></div>
+        <div><div class="num"><?= number_format($stat['expired']) ?></div><div class="lbl">Expired keys</div></div>
     </div>
 </div>
 
 <!-- ===== 2 cột: thông tin tài khoản | số dư + thao tác ===== -->
 <div class="dash-cols">
     <div class="card mb-0">
-        <div class="card-header"><i class="bi bi-person-badge"></i> Thông tin tài khoản</div>
+        <div class="card-header"><i class="bi bi-person-badge"></i> Account Info</div>
         <div class="card-body">
             <div class="acct-row">
-                <span class="k"><i class="bi bi-person"></i> Tài khoản</span>
+                <span class="k"><i class="bi bi-person"></i> Username</span>
                 <span class="v"><?= esc(getName($user)) ?></span>
             </div>
             <div class="acct-row">
-                <span class="k"><i class="bi bi-shield-check"></i> Vai trò</span>
+                <span class="k"><i class="bi bi-shield-check"></i> Role</span>
                 <span class="v"><span class="role-pill <?= $lvl==1?'admin':'' ?>"><i class="bi bi-<?= $lvl==1?'star-fill':'person-fill' ?>"></i> <?= getLevel($user->level) ?></span></span>
             </div>
             <div class="acct-row">
@@ -76,31 +76,31 @@
                 <span class="v"><?= esc($user->uplink ?? '—') ?></span>
             </div>
             <div class="acct-row">
-                <span class="k"><i class="bi bi-toggle-on"></i> Trạng thái</span>
+                <span class="k"><i class="bi bi-toggle-on"></i> Status</span>
                 <span class="v"><?= $user->status ? '<span class="text-success">● Active</span>' : '<span class="text-danger">● Inactive</span>' ?></span>
             </div>
             <div class="acct-row">
-                <span class="k"><i class="bi bi-clock"></i> Đăng nhập lúc</span>
+                <span class="k"><i class="bi bi-clock"></i> Logged in at</span>
                 <span class="v"><?= session()->has('time_since') ? $time::parse(session()->time_since)->humanize() : '—' ?></span>
             </div>
         </div>
     </div>
 
     <div class="card mb-0">
-        <div class="card-header"><i class="bi bi-wallet2"></i> Số dư & Thao tác</div>
+        <div class="card-header"><i class="bi bi-wallet2"></i> Balance & Actions</div>
         <div class="card-body">
             <div class="saldo-card">
                 <div class="saldo-big">$<?= number_format($user->saldo) ?></div>
-                <div class="lbl" style="color:var(--muted);font-size:12.5px;margin-top:6px">Số dư khả dụng</div>
+                <div class="lbl" style="color:var(--muted);font-size:12.5px;margin-top:6px">Available balance</div>
             </div>
             <div class="quick-actions">
-                <a class="qa" href="<?= site_url('keys/generate') ?>"><i class="bi bi-plus-circle"></i> Tạo Key</a>
-                <a class="qa" href="<?= site_url('keys') ?>"><i class="bi bi-list-ul"></i> Danh sách</a>
+                <a class="qa" href="<?= site_url('keys/generate') ?>"><i class="bi bi-plus-circle"></i> Create Key</a>
+                <a class="qa" href="<?= site_url('keys') ?>"><i class="bi bi-list-ul"></i> Key list</a>
                 <?php if($lvl==1): ?>
                 <a class="qa" href="<?= site_url('admin/manage-users') ?>"><i class="bi bi-people"></i> Users</a>
                 <a class="qa" href="<?= site_url('admin/create-referral') ?>"><i class="bi bi-person-plus"></i> Referral</a>
                 <?php else: ?>
-                <a class="qa" href="<?= site_url('settings') ?>" style="grid-column:1/-1"><i class="bi bi-gear"></i> Cài đặt tài khoản</a>
+                <a class="qa" href="<?= site_url('settings') ?>" style="grid-column:1/-1"><i class="bi bi-gear"></i> Account settings</a>
                 <?php endif; ?>
             </div>
         </div>

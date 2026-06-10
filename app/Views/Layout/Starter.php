@@ -216,25 +216,25 @@ if ($loggedIn && (!isset($user) || !is_object($user))) {
                 $lvl = isset($user->level) ? (int)$user->level : 2;
             ?>
             <div class="lx-navgroup">
-                <div class="lx-navlabel">Quản lý</div>
+                <div class="lx-navlabel">Management</div>
                 <a class="lx-navitem <?= $active(['dashboard']) ?>" href="<?= site_url('dashboard') ?>"><i class="bi bi-grid-1x2"></i> Dashboard</a>
                 <a class="lx-navitem <?= ($curPath === 'keys') ? 'active' : '' ?>" href="<?= site_url('keys') ?>"><i class="bi bi-key"></i> Keys</a>
-                <a class="lx-navitem <?= $active(['keys/generate']) ?>" href="<?= site_url('keys/generate') ?>"><i class="bi bi-plus-circle"></i> Tạo Key</a>
+                <a class="lx-navitem <?= $active(['keys/generate']) ?>" href="<?= site_url('keys/generate') ?>"><i class="bi bi-plus-circle"></i> Create Key</a>
             </div>
             <?php if ($lvl == 1): ?>
             <div class="lx-navgroup">
                 <div class="lx-navlabel">Admin</div>
                 <a class="lx-navitem <?= $active(['admin/games']) ?>" href="<?= site_url('admin/games') ?>"><i class="bi bi-controller"></i> Games</a>
-                <a class="lx-navitem <?= $active(['admin/manage-users','admin/user']) ?>" href="<?= site_url('admin/manage-users') ?>"><i class="bi bi-people"></i> Quản lý Users</a>
+                <a class="lx-navitem <?= $active(['admin/manage-users','admin/user']) ?>" href="<?= site_url('admin/manage-users') ?>"><i class="bi bi-people"></i> Manage Users</a>
                 <a class="lx-navitem <?= $active(['admin/create-referral']) ?>" href="<?= site_url('admin/create-referral') ?>"><i class="bi bi-person-plus"></i> Referral</a>
                 <a class="lx-navitem <?= $active(['settings/sdk']) ?>" href="<?= site_url('settings/sdk') ?>"><i class="bi bi-shield-lock"></i> License SDK</a>
             </div>
             <?php endif; ?>
             <div class="lx-navgroup">
-                <div class="lx-navlabel">Tài khoản</div>
+                <div class="lx-navlabel">Account</div>
                 <a class="lx-navitem <?= $active(['settings/api']) ?>" href="<?= site_url('settings/api') ?>"><i class="bi bi-hdd-network"></i> API Token</a>
-                <a class="lx-navitem <?= ($curPath === 'settings') ? 'active' : '' ?>" href="<?= site_url('settings') ?>"><i class="bi bi-gear"></i> Cài đặt</a>
-                <a class="lx-navitem danger" href="<?= site_url('logout') ?>"><i class="bi bi-box-arrow-left"></i> Đăng xuất</a>
+                <a class="lx-navitem <?= ($curPath === 'settings') ? 'active' : '' ?>" href="<?= site_url('settings') ?>"><i class="bi bi-gear"></i> Settings</a>
+                <a class="lx-navitem danger" href="<?= site_url('logout') ?>"><i class="bi bi-box-arrow-left"></i> Logout</a>
             </div>
         </aside>
         <div class="lx-overlay" id="lxOverlay" onclick="lxToggle(false)"></div>

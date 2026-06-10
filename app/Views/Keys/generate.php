@@ -91,7 +91,7 @@
             var $d = $("#duration").empty();
             var keys = Object.keys(list);
             if (!keys.length) {
-                $d.append('<option value="">-- Chưa có gói --</option>');
+                $d.append('<option value="">-- No package --</option>');
                 return;
             }
             keys.forEach(function(h) {

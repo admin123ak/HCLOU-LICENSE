@@ -16,24 +16,24 @@
 
 <?php if (!empty($noTable)): ?>
 <div class="alert alert-warning">
-    ⚠️ <b>Bảng <code>games</code> chưa tồn tại trong database.</b><br>
-    Hãy mở <code><?= site_url('fix_db.php') ?></code> (hoặc <a href="<?= base_url('fix_db.php') ?>" target="_blank" style="color:#fde68a;text-decoration:underline">bấm vào đây</a>) để tạo bảng, rồi quay lại trang này.
+    ⚠️ <b>Table <code>games</code> does not exist in the database.</b><br>
+    Open <code><?= site_url('fix_db.php') ?></code> (or <a href="<?= base_url('fix_db.php') ?>" target="_blank" style="color:#fde68a;text-decoration:underline">click here</a>) to create the table, then come back.
 </div>
 <?php endif; ?>
 
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-controller"></i> Quản lý Game</span>
-        <button class="btn btn-primary btn-sm" onclick="gmOpen()"><i class="bi bi-plus-lg"></i> Thêm game</button>
+        <span><i class="bi bi-controller"></i> Manage Games</span>
+        <button class="btn btn-primary btn-sm" onclick="gmOpen()"><i class="bi bi-plus-lg"></i> Add game</button>
     </div>
     <div class="card-body">
         <?php if (empty($games)): ?>
-            <p class="text-center text-muted py-4">Chưa có game nào. Bấm "Thêm game" để tạo.</p>
+            <p class="text-center text-muted py-4">No games yet. Click "Add game" to create one.</p>
         <?php else: ?>
         <div class="table-responsive">
             <table class="table table-hover align-middle">
                 <thead>
-                    <tr><th>#</th><th>Tên game</th><th>Mã (API)</th><th>Gói cước</th><th>Trạng thái</th><th class="text-end">Thao tác</th></tr>
+                    <tr><th>#</th><th>Game name</th><th>Code (API)</th><th>Packages</th><th>Status</th><th class="text-end">Actions</th></tr>
                 </thead>
                 <tbody>
                 <?php foreach ($games as $g):
@@ -48,18 +48,18 @@
                                 <span class="dur-badge"><?= $d['hours'] ?>h = $<?= rtrim(rtrim(number_format($d['price'],2,'.',''),'0'),'.') ?></span>
                             <?php endforeach; ?>
                         </td>
-                        <td><?= $g['status'] ? '<span class="text-success">● Bật</span>' : '<span class="text-danger">○ Tắt</span>' ?></td>
+                        <td><?= $g['status'] ? '<span class="text-success">● On</span>' : '<span class="text-danger">○ Off</span>' ?></td>
                         <td class="text-end">
-                            <button class="btn btn-primary btn-sm" title="Sửa"
+                            <button class="btn btn-primary btn-sm" title="Edit"
                                 onclick='gmOpen(<?= json_encode([
                                     "id" => $g["id_game"], "name" => $g["name"], "code" => $g["game_code"],
                                     "status" => (int)$g["status"], "sort" => (int)$g["sort_order"],
                                     "durs" => $durs,
                                 ], JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?>)'><i class="bi bi-pencil"></i></button>
-                            <form method="post" action="<?= site_url('admin/games/delete') ?>" style="display:inline" onsubmit="return confirm('Xoá game <?= esc($g['name']) ?>?')">
+                            <form method="post" action="<?= site_url('admin/games/delete') ?>" style="display:inline" onsubmit="return confirm('Delete game <?= esc($g['name']) ?>?')">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="id_game" value="<?= $g['id_game'] ?>">
-                                <button class="btn btn-danger btn-sm" title="Xoá"><i class="bi bi-trash"></i></button>
+                                <button class="btn btn-danger btn-sm" title="Delete"><i class="bi bi-trash"></i></button>
                             </form>
                         </td>
                     </tr>
@@ -71,11 +71,11 @@
     </div>
 </div>
 
-<!-- Modal thêm/sửa -->
+<!-- Add/Edit modal -->
 <div class="gm-modal" id="gmModal">
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span id="gmTitle"><i class="bi bi-plus-circle"></i> Thêm game</span>
+            <span id="gmTitle"><i class="bi bi-plus-circle"></i> Add game</span>
             <button class="btn btn-secondary btn-sm" onclick="gmClose()">✕</button>
         </div>
         <form method="post" action="<?= site_url('admin/games/save') ?>">
@@ -84,35 +84,35 @@
                 <input type="hidden" name="id_game" id="gm_id" value="">
                 <div class="row">
                     <div class="col-md-7 mb-3">
-                        <label class="form-label">Tên game (hiển thị)</label>
+                        <label class="form-label">Game name (display)</label>
                         <input class="form-control" name="name" id="gm_name" placeholder="Free Fire" required>
                     </div>
                     <div class="col-md-5 mb-3">
-                        <label class="form-label">Mã game (API)</label>
+                        <label class="form-label">Game code (API)</label>
                         <input class="form-control" name="game_code" id="gm_code" placeholder="FREEFIRE" style="font-family:monospace;text-transform:uppercase" required>
-                        <small class="text-muted">CHỮ HOA + số + _ . Client gửi mã này.</small>
+                        <small class="text-muted">UPPERCASE + digits + _ . Client sends this code.</small>
                     </div>
                 </div>
-                <label class="form-label">Gói cước (Số giờ → Giá $)</label>
+                <label class="form-label">Packages (Hours → Price $)</label>
                 <div class="gm-rows" id="gmRows"></div>
-                <button type="button" class="btn btn-secondary btn-sm mt-1" onclick="gmAddRow()"><i class="bi bi-plus"></i> Thêm gói</button>
+                <button type="button" class="btn btn-secondary btn-sm mt-1" onclick="gmAddRow()"><i class="bi bi-plus"></i> Add package</button>
                 <div class="row mt-3">
                     <div class="col-6 mb-2">
-                        <label class="form-label">Thứ tự</label>
+                        <label class="form-label">Sort order</label>
                         <input type="number" class="form-control" name="sort_order" id="gm_sort" value="0">
                     </div>
                     <div class="col-6 mb-2">
-                        <label class="form-label">Trạng thái</label>
+                        <label class="form-label">Status</label>
                         <select class="form-select" name="status" id="gm_status">
-                            <option value="1">Bật</option>
-                            <option value="0">Tắt</option>
+                            <option value="1">On</option>
+                            <option value="0">Off</option>
                         </select>
                     </div>
                 </div>
             </div>
             <div class="card-body pt-0 d-flex gap-2">
-                <button type="button" class="btn btn-secondary w-50" onclick="gmClose()">Huỷ</button>
-                <button type="submit" class="btn btn-primary w-50"><i class="bi bi-save"></i> Lưu</button>
+                <button type="button" class="btn btn-secondary w-50" onclick="gmClose()">Cancel</button>
+                <button type="submit" class="btn btn-primary w-50"><i class="bi bi-save"></i> Save</button>
             </div>
         </form>
     </div>
@@ -126,8 +126,8 @@ function gmAddRow(h, p) {
     var row = document.createElement('div');
     row.className = 'gm-line';
     row.innerHTML =
-        '<input type="number" class="form-control" name="d_hours[]" placeholder="Số giờ (vd 24)" value="' + (h||'') + '" min="1">' +
-        '<input type="number" step="0.01" class="form-control" name="d_price[]" placeholder="Giá $ (vd 40)" value="' + (p===0||p?p:'') + '" min="0">' +
+        '<input type="number" class="form-control" name="d_hours[]" placeholder="Hours (e.g. 24)" value="' + (h||'') + '" min="1">' +
+        '<input type="number" step="0.01" class="form-control" name="d_price[]" placeholder="Price $ (e.g. 40)" value="' + (p===0||p?p:'') + '" min="0">' +
         '<button type="button" class="gm-del" onclick="this.parentNode.remove()"><i class="bi bi-x-lg"></i></button>';
     document.getElementById('gmRows').appendChild(row);
 }
@@ -135,7 +135,7 @@ function gmOpen(data) {
     var rows = document.getElementById('gmRows');
     rows.innerHTML = '';
     if (data) {
-        document.getElementById('gmTitle').innerHTML = '<i class="bi bi-pencil"></i> Sửa game';
+        document.getElementById('gmTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit game';
         document.getElementById('gm_id').value = data.id;
         document.getElementById('gm_name').value = data.name;
         document.getElementById('gm_code').value = data.code;
@@ -144,7 +144,7 @@ function gmOpen(data) {
         (data.durs || []).forEach(function(d) { gmAddRow(d.hours, d.price); });
         if (!data.durs || !data.durs.length) gmAddRow();
     } else {
-        document.getElementById('gmTitle').innerHTML = '<i class="bi bi-plus-circle"></i> Thêm game';
+        document.getElementById('gmTitle').innerHTML = '<i class="bi bi-plus-circle"></i> Add game';
         ['gm_id','gm_name','gm_code'].forEach(function(id){document.getElementById(id).value='';});
         document.getElementById('gm_sort').value = 0;
         document.getElementById('gm_status').value = 1;

@@ -90,7 +90,7 @@ class ApiToken extends BaseController
             'api_token'   => $token,
             'api_enabled' => 1,
         ]);
-        return redirect()->to('settings/api')->with('msgSuccess', 'Đã tạo API token mới.');
+        return redirect()->to('settings/api')->with('msgSuccess', 'New API token created.');
     }
 
     /** Bật / tắt API */
@@ -98,22 +98,22 @@ class ApiToken extends BaseController
     {
         $new = empty($this->user->api_enabled) ? 1 : 0;
         $this->userModel->update($this->user->id_users, ['api_enabled' => $new]);
-        return redirect()->to('settings/api')->with('msgSuccess', $new ? 'Đã BẬT API.' : 'Đã TẮT API.');
+        return redirect()->to('settings/api')->with('msgSuccess', $new ? 'API enabled.' : 'API disabled.');
     }
 
     /** Admin: bật/tắt bán API cho 1 game */
     public function toggleGame($id = false)
     {
         if ((int)$this->user->level !== 1) {
-            return redirect()->to('settings/api')->with('msgDanger', 'Chỉ admin.');
+            return redirect()->to('settings/api')->with('msgDanger', 'Admin only.');
         }
         $gm = new GameModel();
         $g = $gm->find((int)$id);
         if ($g) {
             $new = empty($g['api_sale']) ? 1 : 0;
             $gm->update((int)$id, ['api_sale' => $new]);
-            return redirect()->to('settings/api')->with('msgSuccess', $new ? 'Đã MỞ bán API game ' . $g['name'] : 'Đã TẮT bán API game ' . $g['name']);
+            return redirect()->to('settings/api')->with('msgSuccess', $new ? 'API sale enabled for ' . $g['name'] : 'API sale disabled for ' . $g['name']);
         }
-        return redirect()->to('settings/api')->with('msgDanger', 'Game không tồn tại.');
+        return redirect()->to('settings/api')->with('msgDanger', 'Game not found.');
     }
 }

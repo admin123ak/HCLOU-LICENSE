@@ -18,7 +18,7 @@
 
 <?php if (!empty($noCol)): ?>
 <div class="alert alert-warning">
-    ⚠️ Chưa có cột <code>api_token</code> trong DB. Mở <a href="<?= base_url('fix_db.php') ?>" target="_blank" style="color:#fde68a;text-decoration:underline">fix_db.php</a> để tạo, rồi quay lại.
+    ⚠️ Column <code>api_token</code> not found in DB. Open <a href="<?= base_url('fix_db.php') ?>" target="_blank" style="color:#fde68a;text-decoration:underline">fix_db.php</a> to create it, then come back.
 </div>
 <?php else: ?>
 
@@ -26,7 +26,7 @@
     <div class="col-lg-7">
         <!-- Token -->
         <div class="card">
-            <div class="card-header"><i class="bi bi-key-fill"></i> API Token của bạn</div>
+            <div class="card-header"><i class="bi bi-key-fill"></i> Your API Token</div>
             <div class="card-body">
                 <?php if (!empty($user->api_token)): ?>
                     <div class="tok-box">
@@ -36,26 +36,26 @@
                     <div class="d-flex gap-2 mt-2">
                         <a href="<?= site_url('settings/api/toggle') ?>" class="btn btn-sm <?= !empty($user->api_enabled)?'btn-danger':'btn-success' ?>">
                             <i class="bi bi-<?= !empty($user->api_enabled)?'pause-circle':'play-circle' ?>"></i>
-                            <?= !empty($user->api_enabled)?'Tắt API':'Bật API' ?>
+                            <?= !empty($user->api_enabled)?'Disable API':'Enable API' ?>
                         </a>
-                        <a href="<?= site_url('settings/api/generate') ?>" class="btn btn-secondary btn-sm" onclick="return confirm('Tạo token mới? Token cũ sẽ ngừng hoạt động.')">
-                            <i class="bi bi-arrow-repeat"></i> Làm mới token
+                        <a href="<?= site_url('settings/api/generate') ?>" class="btn btn-secondary btn-sm" onclick="return confirm('Generate a new token? The old token will stop working.')">
+                            <i class="bi bi-arrow-repeat"></i> Regenerate token
                         </a>
                     </div>
                     <div class="mt-3">
-                        Trạng thái:
+                        Status:
                         <?php if(!empty($user->api_enabled)): ?>
-                            <span class="badge" style="background:rgba(52,211,153,.14);color:#6ee7b7;border:1px solid rgba(52,211,153,.3)">● Đang bật</span>
+                            <span class="badge" style="background:rgba(52,211,153,.14);color:#6ee7b7;border:1px solid rgba(52,211,153,.3)">● Enabled</span>
                         <?php else: ?>
-                            <span class="badge" style="background:rgba(248,113,113,.14);color:#fca5a5;border:1px solid rgba(248,113,113,.3)">○ Đang tắt</span>
+                            <span class="badge" style="background:rgba(248,113,113,.14);color:#fca5a5;border:1px solid rgba(248,113,113,.3)">○ Disabled</span>
                         <?php endif; ?>
                     </div>
                 <?php else: ?>
-                    <p class="text-muted">Bạn chưa có API token. Tạo token để bot bên ngoài gọi mua key.</p>
-                    <a href="<?= site_url('settings/api/generate') ?>" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Tạo API Token</a>
+                    <p class="text-muted">You don't have an API token yet. Generate one so external clients can buy keys.</p>
+                    <a href="<?= site_url('settings/api/generate') ?>" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Generate API Token</a>
                 <?php endif; ?>
                 <div class="mt-3 p-2" style="background:rgba(99,102,241,.08);border-radius:10px;font-size:12.5px;color:var(--muted)">
-                    💰 Số dư: <b style="color:#6ee7b7">$<?= number_format($user->saldo) ?></b> — mỗi lần bot mua key sẽ trừ vào số dư này.
+                    💰 Balance: <b style="color:#6ee7b7">$<?= number_format($user->saldo) ?></b> — each purchase via API is deducted from this balance.
                 </div>
             </div>
         </div>
@@ -68,18 +68,18 @@
             <div class="card-body">
                 <div class="ep-row">
                     <span class="ep-method ep-get">GET</span>
-                    <div><div class="ep-url"><?= esc($baseApiUrl) ?>/products</div><div class="ep-desc">Danh sách gói game + giá + số dư</div></div>
+                    <div><div class="ep-url"><?= esc($baseApiUrl) ?>/products</div><div class="ep-desc">List game packages + price + balance</div></div>
                 </div>
                 <div class="ep-row">
                     <span class="ep-method ep-get">GET</span>
-                    <div><div class="ep-url"><?= esc($baseApiUrl) ?>/balance</div><div class="ep-desc">Kiểm tra số dư</div></div>
+                    <div><div class="ep-url"><?= esc($baseApiUrl) ?>/balance</div><div class="ep-desc">Check balance</div></div>
                 </div>
                 <div class="ep-row">
                     <span class="ep-method ep-post">POST</span>
-                    <div><div class="ep-url"><?= esc($baseApiUrl) ?>/buy</div><div class="ep-desc">Mua key: <code>game</code>, <code>duration</code>, <code>max_devices</code> → trừ tiền, trả key</div></div>
+                    <div><div class="ep-url"><?= esc($baseApiUrl) ?>/buy</div><div class="ep-desc">Buy key: <code>game</code>, <code>duration</code>, <code>max_devices</code> → deduct balance, return key</div></div>
                 </div>
                 <div class="mt-2" style="font-size:11.5px;color:var(--muted)">
-                    🔑 Gửi token qua header <code>Authorization: Bearer &lt;token&gt;</code> hoặc tham số <code>?token=</code>
+                    🔑 Send token via header <code>Authorization: Bearer &lt;token&gt;</code> or param <code>?token=</code>
                 </div>
             </div>
         </div>
@@ -87,22 +87,22 @@
 </div>
 
 <?php if ((int)$user->level === 1 && !empty($games)): ?>
-<!-- Admin: bật/tắt bán API từng game -->
+<!-- Admin: enable/disable API selling per game -->
 <div class="card">
-    <div class="card-header"><i class="bi bi-toggles"></i> Bật/Tắt bán key qua API (theo game)</div>
+    <div class="card-header"><i class="bi bi-toggles"></i> Enable/Disable API key selling (per game)</div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-hover align-middle">
-                <thead><tr><th>Game</th><th>Mã</th><th>Bán API</th><th class="text-end">Đổi</th></tr></thead>
+                <thead><tr><th>Game</th><th>Code</th><th>API Sale</th><th class="text-end">Change</th></tr></thead>
                 <tbody>
                 <?php foreach ($games as $g): $on = !isset($g['api_sale']) || $g['api_sale']; ?>
                     <tr>
                         <td><b><?= esc($g['name']) ?></b></td>
                         <td><span style="font-family:monospace;color:#7db3ff"><?= esc($g['game_code']) ?></span></td>
-                        <td><?= $on ? '<span class="text-success">● Mở bán</span>' : '<span class="text-danger">○ Đã tắt</span>' ?></td>
+                        <td><?= $on ? '<span class="text-success">● On sale</span>' : '<span class="text-danger">○ Off</span>' ?></td>
                         <td class="text-end">
                             <a href="<?= site_url('settings/api/game/' . $g['id_game']) ?>" class="btn btn-sm <?= $on?'btn-danger':'btn-success' ?>">
-                                <?= $on?'Tắt bán':'Mở bán' ?>
+                                <?= $on?'Disable':'Enable' ?>
                             </a>
                         </td>
                     </tr>
@@ -123,7 +123,7 @@
 function copyTok(){
     var t = document.getElementById('apiTok').innerText;
     if(navigator.clipboard) navigator.clipboard.writeText(t);
-    Toast.fire({ icon:'success', title:'Đã copy token!' });
+    Toast.fire({ icon:'success', title:'Token copied!' });
 }
 </script>
 <?= $this->endSection() ?>
