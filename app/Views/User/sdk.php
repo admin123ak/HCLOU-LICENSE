@@ -118,7 +118,10 @@ public class HclouLicense {
             BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
             StringBuilder sb = new StringBuilder(); String ln;
             while ((ln = br.readLine()) != null) sb.append(ln);
-            JSONObject json = new JSONObject(sb.toString());
+
+            // Response is encrypted (AES+HMAC wrapper). Decrypt; fall back to plain JSON on error.
+            JSONObject json = decryptResponse(sb.toString().trim());
+            if (json == null) return new Result(false, "BAD_RESPONSE");
 
             if (!json.optBoolean("status", false))
                 return new Result(false, json.optString("reason", "INVALID"));
@@ -141,6 +144,28 @@ public class HclouLicense {
             return new Result(true, "");
         } catch (Exception e) {
             return new Result(false, "NETWORK_ERROR");
+        }
+    }
+
+    /** Decrypt encrypted response wrapper; if not a wrapper, parse as plain JSON. */
+    private static JSONObject decryptResponse(String body) {
+        try {
+            String dec = new String(Base64.decode(body, Base64.DEFAULT), "UTF-8");
+            JSONObject w = new JSONObject(dec);
+            if (w.has("x") && w.has("t") && w.has("n") && w.has("m")) {
+                String x = w.getString("x"), t = w.getString("t"), n = w.getString("n"), m = w.getString("m");
+                byte[] mk = sha256(API_SECRET + "|" + n + "|mac");
+                if (!hmacB64(mk, x + "|" + t + "|" + n).equals(m)) return null; // bad MAC
+                byte[] raw = Base64.decode(x, Base64.NO_WRAP);
+                byte[] iv = new byte[16]; System.arraycopy(raw, 0, iv, 0, 16);
+                byte[] ct = new byte[raw.length - 16]; System.arraycopy(raw, 16, ct, 0, ct.length);
+                Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+                c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(sha256(API_SECRET + "|" + t), "AES"), new IvParameterSpec(iv));
+                return new JSONObject(new String(c.doFinal(ct), "UTF-8"));
+            }
+            return w; // plain JSON (legacy / pre-decrypt error)
+        } catch (Exception e) {
+            try { return new JSONObject(body); } catch (Exception e2) { return null; }
         }
     }
 

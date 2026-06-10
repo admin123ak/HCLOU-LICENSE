@@ -7,6 +7,7 @@ use App\Models\KeysModel;
 class Connect extends BaseController
 {
     protected $model, $game, $uKey, $sDev;
+    protected $encCtx = null; // context mã hoá response (nếu request đến dạng mã hoá)
 
     public function __construct()
     {
@@ -100,7 +101,28 @@ class Connect extends BaseController
 
         $obj = json_decode($plain, true);
         if (!is_array($obj)) { $err = 'BAD_JSON'; return null; }
+
+        // Lưu context để MÃ HOÁ response (2 chiều như Kuro)
+        $this->encCtx = ['t' => $t, 'n' => $n, 'sk' => $this->sessionKey($t)];
         return $obj;
+    }
+
+    /**
+     * Trả response. Nếu request đến dạng mã hoá -> mã hoá luôn response (AES+HMAC),
+     * ngược lại trả JSON thường (app cũ). Phần data vẫn chứa chữ ký RSA bên trong.
+     */
+    private function reply($data)
+    {
+        if (!$this->encCtx) {
+            return $this->response->setJSON($data);
+        }
+        $ts = $this->encCtx['t']; $nonce = $this->encCtx['n']; $sk = $this->encCtx['sk'];
+        $iv = random_bytes(16);
+        $ct = openssl_encrypt(json_encode($data), 'aes-256-cbc', $sk, OPENSSL_RAW_DATA, $iv);
+        $d  = base64_encode($iv . $ct);
+        $mac = base64_encode(hash_hmac('sha256', $d . '|' . $ts . '|' . $nonce, $this->macKey($nonce), true));
+        $wrap = base64_encode(json_encode(['x' => $d, 't' => $ts, 'n' => $nonce, 'm' => $mac]));
+        return $this->response->setContentType('text/plain')->setBody($wrap);
     }
 
     /** Chặn xem endpoint qua trình duyệt (cần header X-API-Client). */
@@ -173,7 +195,7 @@ class Connect extends BaseController
             || !preg_match('/^[A-Za-z0-9_-]{1,32}$/', (string)$game)
             || !preg_match('/^[A-Za-z0-9]{1,36}$/', (string)$uKey)
             || !preg_match('/^[A-Za-z0-9_-]{1,128}$/', (string)$sDev)) {
-            return $this->response->setJSON(['status' => false, 'reason' => 'Bad Parameter']);
+            return $this->reply(['status' => false, 'reason' => 'Bad Parameter']);
         }
 
         if ($isMT) {
@@ -197,7 +219,7 @@ class Connect extends BaseController
                 // Nếu chưa import bảng games -> bỏ qua check này (tương thích cũ)
                 $gamesTableExists = $this->gamesTableExists();
                 if ($gamesTableExists && !$gameRow) {
-                    return $this->response->setJSON([
+                    return $this->reply([
                         'status' => false,
                         'reason' => 'GAME NOT FOUND'
                     ]);
@@ -206,17 +228,17 @@ class Connect extends BaseController
                 // 2) Tìm key CHỈ theo user_key (để phân biệt sai key vs sai game)
                 $anyKey = $model->getKeys($uKey, 'user_key');
                 if (!$anyKey) {
-                    return $this->response->setJSON([
+                    return $this->reply([
                         'status' => false,
                         'reason' => 'INVALID KEY'
                     ]);
                 }
                 // 3) Key tồn tại nhưng KHÔNG dành cho game app đang gửi
                 if ($anyKey->game !== $game) {
-                    return $this->response->setJSON([
+                    return $this->reply([
                         'status' => false,
                         'reason' => 'WRONG GAME',
-                        'key_for' => $anyKey->game   // app biết key này thuộc game nào
+                        'key_for' => $anyKey->game
                     ]);
                 }
 
@@ -308,6 +330,6 @@ class Connect extends BaseController
                 }
             }
         }
-        return $this->response->setJSON($data);
+        return $this->reply($data);
     }
 }
