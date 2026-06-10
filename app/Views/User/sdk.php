@@ -129,7 +129,6 @@
     </div>
   </div>
 </div>
-<?php endif; ?>
 
 <?= $this->endSection() ?>
 
