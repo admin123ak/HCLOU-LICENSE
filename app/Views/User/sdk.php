@@ -49,15 +49,21 @@
 </div>
 <?php endif; ?>
 
-<?php if ($currentPublic):
-  // Chuẩn hoá public key 1 dòng để nhúng vào code Android
-  $pubOneLine = trim(preg_replace('/-----(BEGIN|END) PUBLIC KEY-----/', '', $currentPublic));
-  $pubOneLine = preg_replace('/\s+/', '', $pubOneLine);
+<?php
+  // Public key 1 dòng để nhúng (rỗng nếu chưa cấu hình -> app vẫn chạy)
+  $pubOneLine = '';
+  if ($currentPublic) {
+      $pubOneLine = trim(preg_replace('/-----(BEGIN|END) PUBLIC KEY-----/', '', $currentPublic));
+      $pubOneLine = preg_replace('/\s+/', '', $pubOneLine);
+  }
 ?>
 <div class="card">
   <div class="card-header"><i class="bi bi-android2"></i> Code Android (Kotlin) — dán vào app là chạy</div>
   <div class="card-body">
-    <p style="color:var(--muted);font-size:12.5px">Tạo file <code>HclouLicense.kt</code>, dán nguyên đoạn dưới (public key đã nhúng sẵn). Gọi <code>HclouLicense.verify(game, key, serial)</code> khi mở app.</p>
+    <?php if (!$currentPublic): ?>
+      <div class="alert alert-warning" style="font-size:12.5px">⚠️ Chưa cấu hình RSA: <code>PUBLIC_KEY</code> đang để trống → app dán code này vẫn <b>chạy bình thường</b> (chưa bật RSA). Khi nào tạo khoá + dán <code>.env</code>, quay lại copy code này (public key sẽ tự điền) rồi build lại để bật bảo vệ.</div>
+    <?php endif; ?>
+    <p style="color:var(--muted);font-size:12.5px">Tạo file <code>HclouLicense.kt</code>, dán nguyên đoạn dưới. Gọi <code>HclouLicense.verify(game, key, serial)</code> khi mở app. <b>Chưa điền public key → app vẫn chạy</b>; điền vào → bật verify RSA.</p>
     <div class="sdk-code"><pre id="ktCode">object HclouLicense {
     // Public key RSA (panel cấp). KHÔNG cần giấu — chỉ verify, không ký được.
     private const val PUBLIC_KEY =
@@ -66,7 +72,7 @@
 
     data class Result(val ok: Boolean, val reason: String = "")
 
-    /** Gọi server + verify chữ ký RSA. Chạy trên background thread. */
+    /** Gọi server + (nếu đã cấu hình) verify chữ ký RSA. Chạy trên background thread. */
     fun verify(game: String, userKey: String, serial: String): Result {
         try {
             val post = "game=" + enc(game) + "&user_key=" + enc(userKey) + "&serial=" + enc(serial)
@@ -77,26 +83,26 @@
             conn.outputStream.use { it.write(post.toByteArray()) }
             val body = conn.inputStream.bufferedReader().readText()
             val json = org.json.JSONObject(body)
+
+            // Server báo key không hợp lệ / hết hạn / sai game...
             if (!json.optBoolean("status", false))
                 return Result(false, json.optString("reason", "INVALID"))
 
-            val data = json.getJSONObject("data")
-            val payload = data.getString("payload")          // "game|key|serial|ts"
-            val sig = data.getString("sig")                  // chữ ký RSA (base64)
+            val data = json.optJSONObject("data") ?: return Result(false, "NO_DATA")
+            val sig = data.optString("sig", "")
+            val payload = data.optString("payload", "")
 
-            // 1) Verify chữ ký bằng public key
-            if (!checkSign(payload, sig)) return Result(false, "BAD_SIGNATURE")
-
-            // 2) Payload phải khớp đúng request (chống tráo)
-            val p = payload.split("|")
-            if (p.size < 4 || p[0] != game || p[1] != userKey || p[2] != serial)
-                return Result(false, "PAYLOAD_MISMATCH")
-
-            // 3) Chống replay: timestamp lệch tối đa 5 phút
-            val ts = p[3].toLongOrNull() ?: return Result(false, "BAD_TS")
-            val now = System.currentTimeMillis() / 1000
-            if (Math.abs(now - ts) > 300) return Result(false, "EXPIRED_RESPONSE")
-
+            // === RSA chỉ bật khi ĐÃ điền PUBLIC_KEY + server có trả sig ===
+            // Chưa điền key (PUBLIC_KEY rỗng) hoặc server chưa ký -> app chạy bình thường.
+            if (PUBLIC_KEY.isNotBlank() && sig.isNotBlank()) {
+                if (!checkSign(payload, sig)) return Result(false, "BAD_SIGNATURE")
+                val p = payload.split("|")
+                if (p.size < 4 || p[0] != game || p[1] != userKey || p[2] != serial)
+                    return Result(false, "PAYLOAD_MISMATCH")
+                val ts = p[3].toLongOrNull() ?: return Result(false, "BAD_TS")
+                val now = System.currentTimeMillis() / 1000
+                if (Math.abs(now - ts) > 300) return Result(false, "EXPIRED_RESPONSE")
+            }
             return Result(true)
         } catch (e: Exception) {
             return Result(false, "NETWORK_ERROR")
