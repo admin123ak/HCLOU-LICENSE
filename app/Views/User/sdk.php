@@ -56,76 +56,136 @@
       $pubOneLine = trim(preg_replace('/-----(BEGIN|END) PUBLIC KEY-----/', '', $currentPublic));
       $pubOneLine = preg_replace('/\s+/', '', $pubOneLine);
   }
+  // Symmetric secret for request encryption (must match server's connect.apiSecret / staticWords)
+  $apiSecret = env('connect.apiSecret') ?: 'Vm8Lk7Uj2JmsjCPVPVjrLa7zgfx3uz9E';
 ?>
 <div class="card">
-  <div class="card-header"><i class="bi bi-android2"></i> Android code (Kotlin) — paste into the app and run</div>
+  <div class="card-header"><i class="bi bi-android2"></i> Android code (Java) — encrypted request + RSA verify</div>
   <div class="card-body">
+    <div class="alert" style="background:rgba(99,102,241,.1);font-size:12.5px;color:#c7d2fe">
+      🔐 Protection layers (stronger than Kuro): <b>AES-256 encrypted request</b> + <b>HMAC-SHA256</b> + <b>timestamp/nonce anti-replay</b> + <b>browser block</b> + <b>RSA-signed response</b>. Call <code>HclouLicense.verify(game, key, hwid)</code> on a background thread.
+    </div>
     <?php if (!$currentPublic): ?>
-      <div class="alert alert-warning" style="font-size:12.5px">⚠️ RSA not configured: <code>PUBLIC_KEY</code> is empty → the app still <b>runs normally</b> with this code (RSA off). Once you generate a key and paste it into <code>.env</code>, come back, copy this code again (public key auto-filled), and rebuild to enable protection.</div>
+      <div class="alert alert-warning" style="font-size:12.5px">⚠️ RSA not configured yet: <code>PUBLIC_KEY</code> is empty → the app still <b>runs</b> (encryption + HMAC already active). Generate a key + paste into <code>.env</code>, then copy this code again to enable RSA response verification.</div>
     <?php endif; ?>
-    <p style="color:var(--muted);font-size:12.5px">Create file <code>HclouLicense.kt</code> and paste the block below. Call <code>HclouLicense.verify(game, key, serial)</code> on app launch. <b>No public key → app still runs</b>; fill it in → RSA verify turns on.</p>
-    <div class="sdk-code"><pre id="ktCode">object HclouLicense {
-    // RSA public key (from panel). No need to hide — verify-only, cannot sign.
-    private const val PUBLIC_KEY =
-        "<?= esc($pubOneLine) ?>"
-    private const val CONNECT_URL = "<?= esc($connectUrl) ?>"
+    <p style="color:var(--muted);font-size:12.5px">Create <code>HclouLicense.java</code> and paste the block below (keys already embedded).</p>
+    <div class="sdk-code"><pre id="ktCode">import android.util.Base64;
+import org.json.JSONObject;
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.security.*;
+import java.security.spec.X509EncodedKeySpec;
+import java.io.*;
 
-    data class Result(val ok: Boolean, val reason: String = "")
+public class HclouLicense {
+    // RSA public key — verify server response (cannot sign). Safe to embed.
+    private static final String PUBLIC_KEY = "<?= esc($pubOneLine) ?>";
+    // Symmetric secret — AES + HMAC request encryption (must match server .env).
+    private static final String API_SECRET = "<?= esc($apiSecret) ?>";
+    private static final String CONNECT_URL = "<?= esc($connectUrl) ?>";
 
-    /** Call server + (if configured) verify RSA signature. Run on a background thread. */
-    fun verify(game: String, userKey: String, serial: String): Result {
+    public static class Result {
+        public final boolean ok; public final String reason;
+        Result(boolean ok, String reason) { this.ok = ok; this.reason = reason; }
+    }
+
+    /** Verify a license key. Call on a BACKGROUND thread. hwid = unique device id. */
+    public static Result verify(String game, String userKey, String hwid) {
         try {
-            val post = "game=" + enc(game) + "&user_key=" + enc(userKey) + "&serial=" + enc(serial)
-            val conn = (java.net.URL(CONNECT_URL).openConnection() as java.net.HttpURLConnection).apply {
-                requestMethod = "POST"; doOutput = true; connectTimeout = 10000; readTimeout = 10000
-                setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-            }
-            conn.outputStream.use { it.write(post.toByteArray()) }
-            val body = conn.inputStream.bufferedReader().readText()
-            val json = org.json.JSONObject(body)
+            String ts = String.valueOf(System.currentTimeMillis() / 1000L);
+            String nonce = randomHex(8);
+            JSONObject p = new JSONObject();
+            p.put("game", game); p.put("key", userKey); p.put("hwid", hwid);
 
-            // Server reports invalid / expired / wrong-game key...
+            byte[] sessionKey = sha256(API_SECRET + "|" + ts);
+            byte[] macKey     = sha256(API_SECRET + "|" + nonce + "|mac");
+            String d = aesEncrypt(p.toString(), sessionKey);          // base64(iv + ciphertext)
+            String m = hmacB64(macKey, d + "|" + ts + "|" + nonce);   // HMAC-SHA256
+
+            String form = "d=" + enc(d) + "&t=" + ts + "&n=" + enc(nonce) + "&m=" + enc(m);
+            HttpURLConnection conn = (HttpURLConnection) new URL(CONNECT_URL).openConnection();
+            conn.setRequestMethod("POST"); conn.setDoOutput(true);
+            conn.setConnectTimeout(10000); conn.setReadTimeout(10000);
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            conn.setRequestProperty("X-API-Client", "android"); // required (browser block)
+            conn.getOutputStream().write(form.getBytes("UTF-8"));
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder sb = new StringBuilder(); String ln;
+            while ((ln = br.readLine()) != null) sb.append(ln);
+            JSONObject json = new JSONObject(sb.toString());
+
             if (!json.optBoolean("status", false))
-                return Result(false, json.optString("reason", "INVALID"))
+                return new Result(false, json.optString("reason", "INVALID"));
 
-            val data = json.optJSONObject("data") ?: return Result(false, "NO_DATA")
-            val sig = data.optString("sig", "")
-            val payload = data.optString("payload", "")
+            JSONObject data = json.optJSONObject("data");
+            if (data == null) return new Result(false, "NO_DATA");
+            String sig = data.optString("sig", "");
+            String payload = data.optString("payload", "");
 
-            // === RSA only active when PUBLIC_KEY is set AND server returns sig ===
-            // No key (PUBLIC_KEY empty) or server not signing -> app runs normally.
-            if (PUBLIC_KEY.isNotBlank() && sig.isNotBlank()) {
-                if (!checkSign(payload, sig)) return Result(false, "BAD_SIGNATURE")
-                val p = payload.split("|")
-                if (p.size < 4 || p[0] != game || p[1] != userKey || p[2] != serial)
-                    return Result(false, "PAYLOAD_MISMATCH")
-                val ts = p[3].toLongOrNull() ?: return Result(false, "BAD_TS")
-                val now = System.currentTimeMillis() / 1000
-                if (Math.abs(now - ts) > 300) return Result(false, "EXPIRED_RESPONSE")
+            // RSA response check (active once PUBLIC_KEY + server sig are present)
+            if (!PUBLIC_KEY.isEmpty() && !sig.isEmpty()) {
+                if (!checkSign(payload, sig)) return new Result(false, "BAD_SIGNATURE");
+                String[] pp = payload.split("\\|");
+                if (pp.length < 4 || !pp[0].equals(game) || !pp[1].equals(userKey) || !pp[2].equals(hwid))
+                    return new Result(false, "PAYLOAD_MISMATCH");
+                long t = Long.parseLong(pp[3]);
+                long now = System.currentTimeMillis() / 1000L;
+                if (Math.abs(now - t) > 300) return new Result(false, "EXPIRED_RESPONSE");
             }
-            return Result(true)
-        } catch (e: Exception) {
-            return Result(false, "NETWORK_ERROR")
+            return new Result(true, "");
+        } catch (Exception e) {
+            return new Result(false, "NETWORK_ERROR");
         }
     }
 
-    private fun checkSign(payload: String, sigB64: String): Boolean {
-        return try {
-            val keyBytes = android.util.Base64.decode(PUBLIC_KEY, android.util.Base64.DEFAULT)
-            val pub = java.security.KeyFactory.getInstance("RSA")
-                .generatePublic(java.security.spec.X509EncodedKeySpec(keyBytes))
-            val s = java.security.Signature.getInstance("SHA256withRSA")
-            s.initVerify(pub); s.update(payload.toByteArray(Charsets.UTF_8))
-            s.verify(android.util.Base64.decode(sigB64, android.util.Base64.DEFAULT))
-        } catch (e: Exception) { false }
+    private static byte[] sha256(String s) throws Exception {
+        return MessageDigest.getInstance("SHA-256").digest(s.getBytes("UTF-8"));
     }
-
-    private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
+    private static String aesEncrypt(String plain, byte[] key) throws Exception {
+        byte[] iv = new byte[16]; new SecureRandom().nextBytes(iv);
+        Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+        byte[] ct = c.doFinal(plain.getBytes("UTF-8"));
+        byte[] out = new byte[16 + ct.length];
+        System.arraycopy(iv, 0, out, 0, 16);
+        System.arraycopy(ct, 0, out, 16, ct.length);
+        return Base64.encodeToString(out, Base64.NO_WRAP);
+    }
+    private static String hmacB64(byte[] key, String data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(key, "HmacSHA256"));
+        return Base64.encodeToString(mac.doFinal(data.getBytes("UTF-8")), Base64.NO_WRAP);
+    }
+    private static boolean checkSign(String payload, String sigB64) {
+        try {
+            byte[] kb = Base64.decode(PUBLIC_KEY, Base64.DEFAULT);
+            PublicKey pub = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(kb));
+            Signature s = Signature.getInstance("SHA256withRSA");
+            s.initVerify(pub); s.update(payload.getBytes("UTF-8"));
+            return s.verify(Base64.decode(sigB64, Base64.DEFAULT));
+        } catch (Exception e) { return false; }
+    }
+    private static String randomHex(int n) {
+        byte[] b = new byte[n]; new SecureRandom().nextBytes(b);
+        StringBuilder sb = new StringBuilder();
+        for (byte x : b) sb.append(String.format("%02x", x));
+        return sb.toString();
+    }
+    private static String enc(String s) throws Exception { return URLEncoder.encode(s, "UTF-8"); }
 }</pre></div>
-    <button class="btn btn-secondary btn-sm mt-2 copybtn" onclick="cp('ktCode')"><i class="bi bi-clipboard"></i> Copy code Kotlin</button>
+    <button class="btn btn-secondary btn-sm mt-2 copybtn" onclick="cp('ktCode')"><i class="bi bi-clipboard"></i> Copy Java code</button>
     <div class="mt-3 p-2" style="background:rgba(99,102,241,.08);border-radius:10px;font-size:12px;color:var(--muted)">
-      💡 Usage: <code>val r = HclouLicense.verify("PUBG", userKeyInput, deviceSerial)</code> → if <code>r.ok == false</code>, block the app.
-      <br>⚠️ Put verify in <b>native (C++/NDK)</b> + enable <b>R8/ProGuard obfuscation</b> to make patching harder for skilled crackers.
+      💡 Usage (background thread):<br>
+      <code>new Thread(() -> { HclouLicense.Result r = HclouLicense.verify("PUBG", keyInput, hwid);<br>
+      runOnUiThread(() -> { if (!r.ok) finish(); }); }).start();</code>
+      <br>🔑 <code>hwid</code> = unique device id (e.g. <code>Settings.Secure.ANDROID_ID</code>).
+      <br>⚠️ For max protection: move this verify into <b>native C/C++ (NDK .so)</b> + enable <b>R8/ProGuard</b>.
     </div>
   </div>
 </div>
