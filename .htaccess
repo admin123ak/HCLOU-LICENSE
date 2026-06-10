@@ -2,6 +2,16 @@
 Options All -Indexes
 
 # ----------------------------------------------------------------------
+# CHẶN truy cập file nhạy cảm qua web (.env chứa private key + DB pass!)
+# ----------------------------------------------------------------------
+<FilesMatch "^(\.env.*|\.env\.example|.*\.sql|.*\.bk|.*\.bk[0-9]|.*\.log|composer\.(json|lock)|\.git.*)$">
+	Require all denied
+</FilesMatch>
+<Files ".env">
+	Require all denied
+</Files>
+
+# ----------------------------------------------------------------------
 # Rewrite engine
 # ----------------------------------------------------------------------
 
