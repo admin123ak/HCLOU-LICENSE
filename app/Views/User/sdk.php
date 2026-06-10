@@ -58,7 +58,28 @@
   }
   // Symmetric secret for request encryption (must match server's connect.apiSecret / staticWords)
   $apiSecret = env('connect.apiSecret') ?: 'Vm8Lk7Uj2JmsjCPVPVjrLa7zgfx3uz9E';
+  // Public key formatted as C++ string literal (each line "...\n") for main.cpp
+  $pubCpp = '';
+  if ($currentPublic) {
+      foreach (explode("\n", trim($currentPublic)) as $ln) {
+          $ln = trim($ln);
+          if ($ln !== '') $pubCpp .= '    "' . $ln . '\\n"' . "\n";
+      }
+  }
 ?>
+
+<?php if ($currentPublic): ?>
+<div class="card">
+  <div class="card-header"><i class="bi bi-filetype-cpp"></i> Public key cho <code>main.cpp</code> (C++ / native app)</div>
+  <div class="card-body">
+    <p style="color:var(--muted);font-size:12.5px">App native (.so) → dán đoạn này vào <code>RSA_PUBLIC_KEY</code> trong <code>main_secure.cpp</code> (đã format sẵn <code>"...\n"</code> từng dòng):</p>
+    <div class="sdk-code"><pre id="cppKey">static const char* RSA_PUBLIC_KEY =
+<?= esc(rtrim($pubCpp)) ?>;</pre></div>
+    <button class="btn btn-secondary btn-sm mt-2 copybtn" onclick="cp('cppKey')"><i class="bi bi-clipboard"></i> Copy public key (C++)</button>
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="card">
   <div class="card-header"><i class="bi bi-android2"></i> Android code (Java) — encrypted request + RSA verify</div>
   <div class="card-body">
