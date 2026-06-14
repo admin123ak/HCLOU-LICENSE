@@ -1,0 +1,40 @@
+# Disable directory browsing
+Options All -Indexes
+
+# Chặn truy cập file nhạy cảm
+<FilesMatch "^(\.env.*|.*\.sql|.*\.bak|.*\.bk[0-9]?|.*\.log|private\.pem|conn\.php)$">
+	Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+	Options +FollowSymlinks
+	RewriteEngine On
+
+	# === FIX 403: ép cac route CI4 luon vao index.php DU co thu muc that ===
+	# (vd thu muc keys/ chua private.pem che route /keys -> License Manager 403)
+	RewriteRule ^(keys|connect|api|admin|settings|server|dashboard|login|logout|register)(/.*)?$ index.php/$0 [L,NC,QSA]
+
+	# Redirect Trailing Slashes
+	RewriteCond %{REQUEST_FILENAME} !-d
+	RewriteCond %{REQUEST_URI} (.+)/$
+	RewriteRule ^ %1 [L,R=301]
+
+	# www -> non-www
+	RewriteCond %{HTTPS} !=on
+	RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+	RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+
+	# File/folder that ton tai -> phuc vu truc tiep; con lai -> index.php
+	RewriteCond %{REQUEST_FILENAME} !-f
+	RewriteCond %{REQUEST_FILENAME} !-d
+	RewriteRule ^([\s\S]*)$ index.php/$1 [L,NC,QSA]
+
+	RewriteCond %{HTTP:Authorization} .
+	RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+	ErrorDocument 404 index.php
+</IfModule>
+
+ServerSignature Off
