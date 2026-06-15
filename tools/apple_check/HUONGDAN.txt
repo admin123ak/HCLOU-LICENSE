@@ -1,0 +1,41 @@
+========================================
+   HƯỚNG DẪN CHẠY APPLE SERIAL CHECKER
+   (cho người không rành máy tính)
+========================================
+
+BƯỚC 1 — CÀI PYTHON (chỉ làm 1 lần):
+  1. Mở trình duyệt, vào: https://www.python.org/downloads/
+  2. Bấm nút vàng "Download Python"
+  3. Mở file vừa tải.
+  4. ⚠️ QUAN TRỌNG: ở màn hình đầu, TICK ô "Add Python to PATH" (dưới cùng)
+  5. Bấm "Install Now" → chờ xong → Close.
+
+BƯỚC 2 — BỎ 3 FILE VÀO 1 THƯ MỤC:
+  - check.py
+  - run.bat
+  - serials.xlsx
+  (để chung 1 thư mục, vd Desktop)
+
+BƯỚC 3 — ĐIỀN SERIAL:
+  - Mở file serials.xlsx (bằng Excel)
+  - Gõ serial cần check, bắt đầu từ ô A2, mỗi serial 1 dòng
+  - Lưu lại (Ctrl+S)
+
+BƯỚC 4 — CHẠY:
+  - Bật Proton VPN (nếu có)
+  - Double-click (bấm đúp) vào file run.bat
+  - Lần đầu nó tự cài thư viện (chờ 1-2 phút)
+  - Chrome tự mở trang Apple
+
+BƯỚC 5 — DÙNG:
+  - Tool tự điền serial
+  - BẠN nhìn captcha trên Chrome, gõ captcha, bấm "Tiếp tục"
+  - Quay lại cửa sổ đen (CMD), nhấn Enter
+  - Tool đọc kết quả, sang serial tiếp theo
+
+KẾT QUẢ: lưu trong file results.xlsx (cùng thư mục)
+  - Activated = đã kích hoạt (có ngày)
+  - Unactivated = chưa kích hoạt
+  - Unknown/Error = bỏ qua / lỗi
+
+Lưu ý: nếu cửa sổ đen báo "chua cai Python" => làm lại Bước 1, nhớ TICK Add to PATH.
