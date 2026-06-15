@@ -44,23 +44,50 @@ def create_browser():
     except: pass
     return d
 
-# ===== HAM DA SUA: selector dung voi trang Apple moi (Next.js) =====
+# ===== HAM TIM O SERIAL (manh, cho trang load + JS quet sau) =====
 def find_serial_input(driver, wait):
-    strategies=[
-        (By.ID,"serial-number-input"),
-        (By.CSS_SELECTOR,"input.form-textbox-input"),
-        (By.XPATH,"//input[@maxlength='18']"),
-        (By.XPATH,"//input[contains(@aria-label,'sê-ri')]"),
-        (By.XPATH,"//input[@type='text' and @required]"),
-    ]
-    end=time.time()+30
+    js_deep=r"""
+    function deep(){
+      function vis(e){var r=e.getBoundingClientRect();return r.width>0&&r.height>0;}
+      function s(root){
+        var ins=root.querySelectorAll('input');
+        for(var i=0;i<ins.length;i++){var e=ins[i];var t=(e.type||'text').toLowerCase();
+          var c=((e.className||'')+' '+(e.getAttribute('placeholder')||'')+' '+(e.getAttribute('aria-label')||'')).toLowerCase();
+          if(e.id==='serial-number-input') return e;
+          if((t==='text'||t==='search'||t==='')&&vis(e)&&c.indexOf('globalnav')<0&&c.indexOf('searchfield')<0) return e;}
+        var all=root.querySelectorAll('*');
+        for(var j=0;j<all.length;j++){if(all[j].shadowRoot){var f=s(all[j].shadowRoot);if(f)return f;}}
+        return null;}
+      return s(document);
+    } return deep();
+    """
+    end=time.time()+35
     while time.time()<end:
-        for by,val in strategies:
+        # cho trang render xong
+        try:
+            if driver.execute_script("return document.readyState")!="complete":
+                time.sleep(0.6); continue
+        except: pass
+        # 1) selenium selector thuong
+        for by,val in [(By.ID,"serial-number-input"),
+                       (By.CSS_SELECTOR,"input.form-textbox-input"),
+                       (By.XPATH,"//input[@maxlength='18']"),
+                       (By.XPATH,"//input[contains(@aria-label,'sê-ri')]"),
+                       (By.XPATH,"//input[@type='text' and not(@type='hidden')]")]:
             try:
                 el=driver.find_element(by,val)
-                if el and el.is_displayed(): return el
+                if el: return el
             except: pass
+        # 2) JS quet sau (shadow DOM / an)
+        try:
+            el=driver.execute_script(js_deep)
+            if el: return el
+        except: pass
         time.sleep(1)
+    # khong thay -> in trang hien tai de chan doan
+    try:
+        print("   [debug] URL:",driver.current_url,"| Title:",driver.title)
+    except: pass
     return None
 
 def js_set(driver,el,val):
@@ -87,27 +114,95 @@ def find_date(line):
     if m: d,mt,y=m.groups(); return f"{int(d):02d}/{int(mt):02d}/{y}"
     return line.strip()
 
+URL="https://checkcoverage.apple.com/?locale=vi_VN"
+
+def result_ready(driver):
+    low=driver.find_element(By.TAG_NAME,"body").text.lower()
+    return ("tháng" in low or "không hợp lệ" in low or "chưa được kích hoạt" in low
+            or "không thể hoàn thành" in low or "bảo hành" in low or "đủ điều kiện" in low)
+
+def click_submit(driver):
+    # nut Gui/Tiep tuc cua Apple (id serial-button) hoac theo text
+    for by,val in [(By.ID,"serial-button"),
+                   (By.CSS_SELECTOR,"button[type='submit']"),
+                   (By.XPATH,"//button[contains(.,'Gửi') or contains(.,'Tiếp tục') or contains(.,'Kiểm tra') or contains(.,'Continue')]")]:
+        try:
+            b=driver.find_element(by,val)
+            if b and b.is_enabled():
+                driver.execute_script("arguments[0].click();",b); return True
+        except: pass
+    return False
+
+def go_to_form(driver):
+    # tim nut 'Kiem tra san pham khac' de GIU PHIEN (khoi nhap captcha lai)
+    for xp in ["//a[contains(.,'khác') or contains(.,'sản phẩm khác')]",
+               "//button[contains(.,'khác') or contains(.,'sản phẩm khác')]",
+               "//a[contains(.,'another') or contains(.,'lại')]",
+               "//button[contains(.,'another') or contains(.,'lại')]"]:
+        try:
+            b=driver.find_element(By.XPATH,xp)
+            if b and b.is_displayed():
+                driver.execute_script("arguments[0].click();",b); time.sleep(1.5); return True
+        except: pass
+    return False
+
 def handle(driver,serial,i,total):
     try:
-        driver.get("https://checkcoverage.apple.com/?locale=vi_VN")
-        wait=WebDriverWait(driver,60)
+        wait=WebDriverWait(driver,30)
         print(f"\n({i}/{total}) Serial: {serial}")
+        # 1) Dam bao dang o FORM nhap serial (giu phien, khong reload)
         el=find_serial_input(driver,wait)
         if not el:
+            go_to_form(driver)              # thu bam 'kiem tra san pham khac'
+            el=find_serial_input(driver,wait)
+        if not el:
+            driver.get(URL)                 # cung duong -> reload (se can captcha lai)
+            el=find_serial_input(driver,wait)
+        if not el:
             print("Khong tim duoc o serial"); return Result(serial,"ERROR","","")
+
+        # 2) Dien serial + bam Gui
         js_set(driver,el,serial)
-        input(">> Nhap captcha & bam Tiep tuc, roi an Enter o day...")
-        body=driver.find_element(By.TAG_NAME,"body").text.lower()
-        if "ngày mua không hợp lệ" in body or "thiết bị chưa được kích hoạt" in body:
+        click_submit(driver)
+
+        # 3) Cho ket qua 6s. Neu RA ket qua -> tu dong (khong can captcha).
+        auto=False
+        for _ in range(6):
+            time.sleep(1)
+            if result_ready(driver): auto=True; break
+        # 4) Chua ra -> co captcha -> nho user nhap
+        if not auto:
+            input(">> Co CAPTCHA: nhap captcha + bam Gui, roi an Enter (neu da ra ket qua thi cu Enter)...")
+            click_submit(driver)
+            for _ in range(20):
+                if result_ready(driver): break
+                time.sleep(1)
+
+        body=driver.find_element(By.TAG_NAME,"body").text
+        low=body.lower()
+
+        # Apple chan / loi tam thoi
+        if "không thể hoàn thành" in low:
+            print("Trang thai: Unknown (Apple chan)"); return Result(serial,"Unknown","","")
+        # Chua kich hoat
+        if "không hợp lệ" in low or "chưa được kích hoạt" in low:
             print("Trang thai: Unactivated"); return Result(serial,"Unactivated","","")
-        pur=exp=""
-        try: pur=find_date(driver.find_element(By.XPATH,"//body//*[contains(text(),'Đã mua')]").text)
-        except: pass
-        try: exp=find_date(driver.find_element(By.XPATH,"//body//*[contains(text(),'Hết hạn')]").text)
-        except: pass
-        if pur or exp:
-            print("Trang thai: Activated", pur, exp); return Result(serial,"Activated",pur,exp)
-        print("Khong xac dinh"); return Result(serial,"Unknown","","")
+
+        # Tim TAT CA ngay dang "16 tháng 9, 2025" tren toan trang
+        dates=re.findall(r"(\d{1,2})\s+tháng\s+(\d{1,2}),?\s*(\d{4})", body, re.I)
+        norm=[f"{int(d):02d}/{int(m):02d}/{y}" for d,m,y in dates]
+        if norm:
+            pur=norm[0]
+            exp=norm[1] if len(norm)>1 else ""
+            print("Trang thai: Activated | mua:",pur,"| het BH:",exp or "(het han/khong co)")
+            return Result(serial,"Activated",pur,exp)
+
+        # Khong doc duoc -> in 1 doan body de gui lai cho minh chinh selector
+        print("Khong xac dinh. Noi dung trang (gui lai doan nay neu sai):")
+        print("----- BODY -----")
+        print(body[:400])
+        print("----------------")
+        return Result(serial,"Unknown","","")
     except Exception as e:
         print("Loi:",e); return Result(serial,"ERROR","","")
 
