@@ -150,6 +150,11 @@ def handle(driver,serial,i,total):
     try:
         wait=WebDriverWait(driver,30)
         print(f"\n({i}/{total}) Serial: {serial}")
+        # 0) Dam bao dang o TRANG APPLE (neu dang data:, blank, trang khac -> mo lai)
+        try: cur=driver.current_url or ""
+        except: cur=""
+        if "checkcoverage.apple.com" not in cur:
+            driver.get(URL); time.sleep(2)
         # 1) Dam bao dang o FORM nhap serial (giu phien, khong reload)
         el=find_serial_input(driver,wait)
         if not el:
@@ -211,6 +216,7 @@ def main():
     if not serials: print("Khong co serial nao trong serials.xlsx (bat dau o A2)"); return
     print("Da nap",len(serials),"serial")
     i,results=load_progress(); d=create_browser()
+    d.get(URL); time.sleep(2)   # mo trang Apple ngay tu dau (khoi dung o data:,)
     while i<len(serials):
         try:
             results.append(handle(d,serials[i],i+1,len(serials))); i+=1; save_progress(i,results)
