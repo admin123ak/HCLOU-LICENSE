@@ -64,8 +64,22 @@ def find_serial_input(driver, wait):
     return None
 
 def js_set(driver,el,val):
-    driver.execute_script("""var e=arguments[0],v=arguments[1];e.focus();e.value=v;
-    ['input','change'].forEach(function(n){e.dispatchEvent(new Event(n,{bubbles:true}));});""",el,val)
+    # Trang Apple la React -> dat .value thuong bi React xoa. Go phim that truoc.
+    try: el.click(); el.clear()
+    except: pass
+    try: el.send_keys(val)
+    except: pass
+    time.sleep(0.3)
+    try: cur=el.get_attribute("value") or ""
+    except: cur=""
+    if cur.strip().upper()!=str(val).strip().upper():
+        driver.execute_script("""
+        var el=arguments[0],v=arguments[1];
+        var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+        s.call(el,v);
+        el.dispatchEvent(new Event('input',{bubbles:true}));
+        el.dispatchEvent(new Event('change',{bubbles:true}));
+        """,el,val)
     time.sleep(0.4)
 
 def find_date(line):
