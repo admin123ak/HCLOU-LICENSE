@@ -117,9 +117,16 @@ def find_date(line):
 URL="https://checkcoverage.apple.com/?locale=vi_VN"
 
 def result_ready(driver):
-    low=driver.find_element(By.TAG_NAME,"body").text.lower()
-    return ("tháng" in low or "không hợp lệ" in low or "chưa được kích hoạt" in low
-            or "không thể hoàn thành" in low or "bảo hành" in low or "đủ điều kiện" in low)
+    # CHI coi la co ket qua khi: co NGAY that, hoac trang thai ro rang.
+    # (KHONG dung 'bao hanh'/'ho tro' vi co san tren trang form -> nham!)
+    try: body=driver.find_element(By.TAG_NAME,"body").text
+    except: return False
+    low=body.lower()
+    if ("không hợp lệ" in low or "chưa được kích hoạt" in low or "không thể hoàn thành" in low):
+        return True
+    if re.search(r"\d{1,2}\s+tháng\s+\d{1,2},?\s*\d{4}", body, re.I):
+        return True
+    return False
 
 def click_submit(driver):
     # nut Gui/Tiep tuc cua Apple (id serial-button) hoac theo text
