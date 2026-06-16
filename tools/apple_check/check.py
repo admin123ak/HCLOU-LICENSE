@@ -103,7 +103,6 @@ def find_serial_input(driver, wait):
             except: pass
         time.sleep(0.8)
     return None
-    return None
 
 def js_set(driver,el,val):
     # Trang Apple la React -> dat .value thuong bi React xoa. Go phim that truoc.
