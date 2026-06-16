@@ -102,8 +102,7 @@ def find_serial_input(driver, wait):
                     return el
             except: pass
         time.sleep(0.8)
-    try: print("   [debug] URL:",driver.current_url,"| Title:",driver.title)
-    except: pass
+    return None
     return None
 
 def js_set(driver,el,val):
@@ -157,37 +156,51 @@ def click_submit(driver):
     return False
 
 def go_to_form(driver):
-    # Bam 'Bat dau lai' / 'san pham khac' de GIU PHIEN (khoi nhap captcha lai)
+    # Bam nut quay ve form. CHI giu neu sau khi bam THAT SU thay o serial
+    # (tranh nut 'Bat dau lai' tren trang coverage dan sang trang Support).
     for xp in ["//*[contains(text(),'Bắt đầu lại')]",
                "//*[contains(text(),'sản phẩm khác')]",
-               "//*[contains(text(),'kiểm tra') and (self::a or self::button)]",
-               "//a[contains(.,'khác')]","//button[contains(.,'khác')]",
-               "//*[contains(text(),'Start over')]","//*[contains(text(),'another')]"]:
+               "//*[contains(text(),'Kiểm tra sản phẩm')]",
+               "//*[contains(text(),'Start over')]"]:
         try:
             b=driver.find_element(By.XPATH,xp)
             if b and b.is_displayed():
-                driver.execute_script("arguments[0].click();",b); time.sleep(1.5); return True
+                driver.execute_script("arguments[0].click();",b); time.sleep(2)
+                # kiem tra co o serial khong -> co thi OK, khong thi nut nay sai
+                try:
+                    if driver.find_element(By.ID,"serial-number-input"): return True
+                except: pass
         except: pass
     return False
 
 def handle(driver,serial,i,total,need_load):
     try:
-        wait=WebDriverWait(driver,20)
+        wait=WebDriverWait(driver,15)
         print(f"\n({i}/{total}) Serial: {serial}")
 
-        # 1) VE FORM nhap serial.
-        #    need_load=True (lan dau / sau khi doi VPN / loi) -> reload trang.
-        #    need_load=False -> bam 'Bat dau lai' GIU SESSION (khong mat captcha!).
+        # 1) VE FORM nhap serial. Uu tien GIU SESSION:
+        #    - thu bam 'Bat dau lai' -> NEU thay o serial thi giu phien (captcha con).
+        #    - khong thay -> reload URL form (van giu cookie cua profile).
         el=None
         if not need_load:
-            go_to_form(driver)                 # bam 'Bat dau lai' (giu phien)
+            go_to_form(driver)
             el=find_serial_input(driver,wait)
         if not el:
-            driver.get(URL); time.sleep(2)     # khong duoc -> reload
+            driver.get(URL); time.sleep(2)
+            el=find_serial_input(driver,wait)
+        # reload them 1 lan neu van chua co (trang load cham)
+        if not el:
+            driver.get(URL); time.sleep(3)
             el=find_serial_input(driver,wait)
         if not el:
-            print("  Khong tim duoc o serial (Apple chan IP? -> doi VPN).")
-            ans=input("  >> Doi VPN xong Enter de thu lai | 's' bo qua: ").strip().lower()
+            # Phan biet: la trang Apple binh thuong (mat captcha?) hay that su bi chan
+            try: t=driver.find_element(By.TAG_NAME,"body").text.lower()
+            except: t=""
+            if "không thể hoàn thành" in t or "/error" in (driver.current_url or ""):
+                print("  Apple CHAN IP that -> doi VPN.")
+            else:
+                print("  Trang chua hien o serial (load cham / Apple bao tri).")
+            ans=input("  >> Enter de thu lai serial nay | 's' bo qua: ").strip().lower()
             if ans=="s": return Result(serial,"Error","",""),True
             return handle(driver,serial,i,total,True)
 
