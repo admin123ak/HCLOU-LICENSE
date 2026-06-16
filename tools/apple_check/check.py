@@ -174,101 +174,63 @@ def handle(driver,serial,i,total):
     try:
         wait=WebDriverWait(driver,20)
         print(f"\n({i}/{total}) Serial: {serial}")
-        if i>1: time.sleep(random.uniform(1.0,2.5))   # nghi nhu nguoi that
-        # Neu dang o trang KET QUA (/coverage,/error) -> ve form NGAY (khong tim o 30s vo ich)
-        try: cur=driver.current_url or ""
-        except: cur=""
-        if "/coverage" in cur or "/error" in cur or i==1:
-            if not go_to_form(driver):        # thu bam 'Bat dau lai' (giu phien)
-                driver.get(URL); time.sleep(2)  # khong co nut -> reload
+
+        # 1) VE FORM nhap serial (reload trang form moi serial - don gian, chac chan)
+        driver.get(URL); time.sleep(2)
         el=find_serial_input(driver,wait)
         if not el:
-            driver.get(URL); time.sleep(2)
-            el=find_serial_input(driver,wait)
-        if not el:
-            print("Khong tim duoc o serial (co the Apple chan IP -> doi VPN)")
-            try: print("   [debug]",driver.current_url,"|",driver.title)
-            except: pass
-            return Result(serial,"ERROR","","")
+            print("  Khong tim duoc o serial (Apple chan IP? -> doi VPN).")
+            ans=input("  >> Doi VPN xong Enter de thu lai | 's' bo qua: ").strip().lower()
+            if ans=="s": return Result(serial,"Error","","")
+            return handle(driver,serial,i,total)
 
-        # Dien serial + bam Gui ho
+        # 2) Dien serial
         js_set(driver,el,serial)
-        time.sleep(0.5)
-        click_submit(driver)
-        time.sleep(2)
+        smooth_scroll(driver,3,0.05)
 
-        # Co o nhap captcha hien khong?
-        def at_form():
-            try:
-                cur=driver.current_url or ""
-                if "/coverage" in cur or "/error" in cur: return False
-                t=driver.find_element(By.TAG_NAME,"body").text.lower()
-                return "sê-ri" in t and ("captcha" in t or "mã" in t)
-            except: return False
+        # 3) USER: nhap captcha (neu co) + bam Gui, DOI ra ket qua, ROI Enter
+        input("  >> Nhap captcha + bam Gui, DOI ket qua hien ra, roi an Enter...")
 
-        # Neu con o form (co captcha) -> user nhap captcha + TU BAM GUI roi Enter
-        if at_form():
-            input(">> Nhap captcha + TU BAM nut Gui tren trang, doi ra ket qua, ROI an Enter o day...")
-
-        # CHO RA KHOI FORM: doi URL sang /coverage hoac /error (toi da 40s)
+        # 4) Doc ket qua (cho them toi 15s neu chua render)
         body=""; cur=""
-        for _ in range(40):
+        for _ in range(15):
             try:
                 cur=driver.current_url or ""
                 body=driver.find_element(By.TAG_NAME,"body").text
-            except: cur=""; body=""
-            if "/coverage" in cur or "/error" in cur:
-                time.sleep(1.5)
-                try: body=driver.find_element(By.TAG_NAME,"body").text
-                except: pass
+            except: body=""
+            low=body.lower()
+            if re.search(r"\d{1,2}\s+tháng\s+\d{1,2},?\s*\d{4}",body,re.I) \
+               or "chưa được kích hoạt" in low or "không hợp lệ" in low \
+               or "không thể hoàn thành" in low or "/error" in cur:
                 break
             time.sleep(1)
         low=body.lower()
 
-        # Van o form sau khi cho? -> user bam Gui chua ra -> cho them 1 lan
-        if "/coverage" not in cur and "/error" not in cur:
-            input(">> Trang chua ra ket qua. Bam Gui tren trang cho RA KET QUA roi Enter lai...")
-            for _ in range(20):
-                try: cur=driver.current_url or ""; body=driver.find_element(By.TAG_NAME,"body").text
-                except: pass
-                if "/coverage" in cur or "/error" in cur: time.sleep(1.5); break
-                time.sleep(1)
-            low=body.lower()
-
-        # LUU trang ket qua ra file (de gui minh xem khi sai)
-        try:
-            open("debug_last.txt","w",encoding="utf-8").write(
-                f"SERIAL: {serial}\nURL: {cur}\n----BODY----\n{body}")
+        # luu trang de debug khi can
+        try: open("debug_last.txt","w",encoding="utf-8").write(f"SERIAL:{serial}\nURL:{cur}\n---\n{body}")
         except: pass
 
-        # === APPLE CHAN IP -> doi VPN, thu lai ===
+        # 5) Phan loai
         if "/error" in cur or "generic_error" in low:
-            print("!! Apple CHAN IP. DOI Proton VPN sang nuoc khac.")
-            ans=input(">> Doi VPN xong an Enter de THU LAI | go 's' bo qua: ").strip().lower()
+            print("  !! Apple CHAN IP -> doi VPN.")
+            ans=input("  >> Doi VPN xong Enter thu lai | 's' bo qua: ").strip().lower()
             if ans=="s": return Result(serial,"Error","","")
             return handle(driver,serial,i,total)
 
-        # Doc ket qua tu TOAN BO body (du o /coverage hay con o form da co ket qua)
-        # === Activated: co ngay ===
-        dates=re.findall(r"(\d{1,2})\s+tháng\s+(\d{1,2}),?\s*(\d{4})", body, re.I)
+        dates=re.findall(r"(\d{1,2})\s+tháng\s+(\d{1,2}),?\s*(\d{4})",body,re.I)
         if dates:
             norm=[f"{int(d):02d}/{int(m):02d}/{y}" for d,m,y in dates]
             pur=norm[0]; exp=norm[1] if len(norm)>1 else ""
-            print("Trang thai: Activated | mua:",pur,"| het BH:",exp or "(het han)")
+            print("  -> Activated | mua:",pur,"| het BH:",exp or "(het han)")
             return Result(serial,"Activated",pur,exp)
-        if "chưa được kích hoạt" in low:
-            print("Trang thai: Unactivated"); return Result(serial,"Unactivated","","")
-        if "không hợp lệ" in low:
-            print("Trang thai: Unactivated (serial loi)"); return Result(serial,"Unactivated","","")
+        if "chưa được kích hoạt" in low or "không hợp lệ" in low:
+            print("  -> Unactivated"); return Result(serial,"Unactivated","","")
         if "không thể hoàn thành" in low:
-            print("Trang thai: Unknown"); return Result(serial,"Unknown","","")
-
-        # Khong parse duoc -> dump
-        print("Khong doc duoc (xem debug_last.txt):")
-        print(body[:300])
+            print("  -> Unknown"); return Result(serial,"Unknown","","")
+        print("  -> Unknown (xem debug_last.txt)"); print(body[:200])
         return Result(serial,"Unknown","","")
     except Exception as e:
-        print("Loi:",e); return Result(serial,"ERROR","","")
+        print("  Loi:",e); return Result(serial,"ERROR","","")
 
 def main():
     serials=read_serials(INPUT_FILE)
