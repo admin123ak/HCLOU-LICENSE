@@ -44,49 +44,28 @@ def create_browser():
     except: pass
     return d
 
-# ===== HAM TIM O SERIAL (manh, cho trang load + JS quet sau) =====
+# ===== HAM TIM O SERIAL (CHI lay dung o serial, KHONG nham o search) =====
 def find_serial_input(driver, wait):
-    js_deep=r"""
-    function deep(){
-      function vis(e){var r=e.getBoundingClientRect();return r.width>0&&r.height>0;}
-      function s(root){
-        var ins=root.querySelectorAll('input');
-        for(var i=0;i<ins.length;i++){var e=ins[i];var t=(e.type||'text').toLowerCase();
-          var c=((e.className||'')+' '+(e.getAttribute('placeholder')||'')+' '+(e.getAttribute('aria-label')||'')).toLowerCase();
-          if(e.id==='serial-number-input') return e;
-          if((t==='text'||t==='search'||t==='')&&vis(e)&&c.indexOf('globalnav')<0&&c.indexOf('searchfield')<0) return e;}
-        var all=root.querySelectorAll('*');
-        for(var j=0;j<all.length;j++){if(all[j].shadowRoot){var f=s(all[j].shadowRoot);if(f)return f;}}
-        return null;}
-      return s(document);
-    } return deep();
-    """
-    end=time.time()+35
+    # CHi nhung selector CHAC CHAN la o serial (tranh o globalnav search!)
+    end=time.time()+30
     while time.time()<end:
-        # cho trang render xong
         try:
             if driver.execute_script("return document.readyState")!="complete":
-                time.sleep(0.6); continue
+                time.sleep(0.5); continue
         except: pass
-        # 1) selenium selector thuong
-        for by,val in [(By.ID,"serial-number-input"),
-                       (By.CSS_SELECTOR,"input.form-textbox-input"),
-                       (By.XPATH,"//input[@maxlength='18']"),
-                       (By.XPATH,"//input[contains(@aria-label,'sê-ri')]"),
-                       (By.XPATH,"//input[@type='text' and not(@type='hidden')]")]:
+        for by,val in [(By.ID,"serial-number-input"),                 # id chinh xac
+                       (By.CSS_SELECTOR,"input#serial-number-input"),
+                       (By.XPATH,"//input[@maxlength='18']"),          # o serial gioi han 18 ky tu
+                       (By.XPATH,"//input[contains(@aria-label,'sê-ri') or contains(@aria-label,'se-ri')]")]:
             try:
                 el=driver.find_element(by,val)
-                if el: return el
+                # khong nhan o globalnav search
+                cls=(el.get_attribute("class") or "").lower()
+                if el and "globalnav" not in cls and "searchfield" not in cls:
+                    return el
             except: pass
-        # 2) JS quet sau (shadow DOM / an)
-        try:
-            el=driver.execute_script(js_deep)
-            if el: return el
-        except: pass
-        time.sleep(1)
-    # khong thay -> in trang hien tai de chan doan
-    try:
-        print("   [debug] URL:",driver.current_url,"| Title:",driver.title)
+        time.sleep(0.8)
+    try: print("   [debug] URL:",driver.current_url,"| Title:",driver.title)
     except: pass
     return None
 
