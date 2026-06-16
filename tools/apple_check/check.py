@@ -74,6 +74,13 @@ def create_browser():
     except: pass
     return d
 
+def smooth_scroll(driver,lines=6,delay=0.05):
+    # cuon trang nhe (gia nguoi that, do bi nghi bot)
+    for _ in range(lines):
+        try: driver.execute_script("window.scrollBy(0, window.innerHeight/6);")
+        except: pass
+        time.sleep(delay)
+
 # ===== HAM TIM O SERIAL (CHI lay dung o serial, KHONG nham o search) =====
 def find_serial_input(driver, wait):
     # CHi nhung selector CHAC CHAN la o serial (tranh o globalnav search!)
