@@ -139,11 +139,12 @@ def click_submit(driver):
     return False
 
 def go_to_form(driver):
-    # tim nut 'Kiem tra san pham khac' de GIU PHIEN (khoi nhap captcha lai)
-    for xp in ["//a[contains(.,'khác') or contains(.,'sản phẩm khác')]",
-               "//button[contains(.,'khác') or contains(.,'sản phẩm khác')]",
-               "//a[contains(.,'another') or contains(.,'lại')]",
-               "//button[contains(.,'another') or contains(.,'lại')]"]:
+    # Bam 'Bat dau lai' / 'san pham khac' de GIU PHIEN (khoi nhap captcha lai)
+    for xp in ["//*[contains(text(),'Bắt đầu lại')]",
+               "//*[contains(text(),'sản phẩm khác')]",
+               "//*[contains(text(),'kiểm tra') and (self::a or self::button)]",
+               "//a[contains(.,'khác')]","//button[contains(.,'khác')]",
+               "//*[contains(text(),'Start over')]","//*[contains(text(),'another')]"]:
         try:
             b=driver.find_element(By.XPATH,xp)
             if b and b.is_displayed():
@@ -155,9 +156,15 @@ def handle(driver,serial,i,total):
     try:
         wait=WebDriverWait(driver,30)
         print(f"\n({i}/{total}) Serial: {serial}")
-        # FORM SACH moi serial (tranh doc nham ket qua serial truoc)
-        driver.get(URL); time.sleep(1.5)
-        el=find_serial_input(driver,wait)
+        # GIU PHIEN: thu bam 'Bat dau lai' ve form (KHONG reload -> captcha con song)
+        el=find_serial_input(driver,wait) if i>1 else None
+        if not el:
+            go_to_form(driver)
+            el=find_serial_input(driver,wait)
+        # neu van khong co form -> reload (se can captcha lai)
+        if not el:
+            driver.get(URL); time.sleep(1.5)
+            el=find_serial_input(driver,wait)
         if not el:
             print("Khong tim duoc o serial")
             try: print("   [debug]",driver.current_url,"|",driver.title)
