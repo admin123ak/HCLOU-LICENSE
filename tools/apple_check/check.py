@@ -194,41 +194,49 @@ def handle(driver,serial,i,total):
             except: pass
             return Result(serial,"ERROR","","")
 
-        # Dien serial + bam Gui
+        # Dien serial + bam Gui ho
         js_set(driver,el,serial)
+        time.sleep(0.5)
         click_submit(driver)
         time.sleep(2)
 
-        # CO captcha hien khong? Neu KHONG (cookie con song) -> tu dong, KHOI nhap.
-        def has_captcha():
+        # Co o nhap captcha hien khong?
+        def at_form():
             try:
-                t=driver.find_element(By.TAG_NAME,"body").text.lower()
                 cur=driver.current_url or ""
-                # con o form + co chu captcha = dang doi captcha
-                return ("captcha" in t and "sê-ri" in t and "/coverage" not in cur and "/error" not in cur)
+                if "/coverage" in cur or "/error" in cur: return False
+                t=driver.find_element(By.TAG_NAME,"body").text.lower()
+                return "sê-ri" in t and ("captcha" in t or "mã" in t)
             except: return False
 
-        if has_captcha():
-            input(">> Co CAPTCHA: nhap + bam Gui, roi an Enter o day...")
-            click_submit(driver)
-            time.sleep(1)
-        # neu khong co captcha -> chay thang xuong doc ket qua (TU DONG)
+        # Neu con o form (co captcha) -> user nhap captcha + TU BAM GUI roi Enter
+        if at_form():
+            input(">> Nhap captcha + TU BAM nut Gui tren trang, doi ra ket qua, ROI an Enter o day...")
 
-        # CHO RA KHOI FORM: doi den khi URL doi sang /coverage hoac /error
+        # CHO RA KHOI FORM: doi URL sang /coverage hoac /error (toi da 40s)
         body=""; cur=""
-        for _ in range(30):
+        for _ in range(40):
             try:
                 cur=driver.current_url or ""
                 body=driver.find_element(By.TAG_NAME,"body").text
             except: cur=""; body=""
-            # da ra khoi form khi vao /coverage hoac /error
             if "/coverage" in cur or "/error" in cur:
-                time.sleep(1.2)   # cho noi dung render xong
+                time.sleep(1.5)
                 try: body=driver.find_element(By.TAG_NAME,"body").text
                 except: pass
                 break
             time.sleep(1)
         low=body.lower()
+
+        # Van o form sau khi cho? -> user bam Gui chua ra -> cho them 1 lan
+        if "/coverage" not in cur and "/error" not in cur:
+            input(">> Trang chua ra ket qua. Bam Gui tren trang cho RA KET QUA roi Enter lai...")
+            for _ in range(20):
+                try: cur=driver.current_url or ""; body=driver.find_element(By.TAG_NAME,"body").text
+                except: pass
+                if "/coverage" in cur or "/error" in cur: time.sleep(1.5); break
+                time.sleep(1)
+            low=body.lower()
 
         # LUU trang ket qua ra file (de gui minh xem khi sai)
         try:
@@ -243,26 +251,24 @@ def handle(driver,serial,i,total):
             if ans=="s": return Result(serial,"Error","","")
             return handle(driver,serial,i,total)
 
-        # Con o FORM (chua submit) -> Unknown, bao ro
-        if "/coverage" not in cur:
-            print("Chua ra ket qua (van o form). -> Unknown. Lan sau: bam Gui THAY ket qua roi moi Enter.")
-            return Result(serial,"Unknown","","")
-
-        # === O trang /coverage: doc ket qua ===
+        # Doc ket qua tu TOAN BO body (du o /coverage hay con o form da co ket qua)
+        # === Activated: co ngay ===
         dates=re.findall(r"(\d{1,2})\s+tháng\s+(\d{1,2}),?\s*(\d{4})", body, re.I)
         if dates:
             norm=[f"{int(d):02d}/{int(m):02d}/{y}" for d,m,y in dates]
             pur=norm[0]; exp=norm[1] if len(norm)>1 else ""
             print("Trang thai: Activated | mua:",pur,"| het BH:",exp or "(het han)")
             return Result(serial,"Activated",pur,exp)
-        if "không hợp lệ" in low or "chưa được kích hoạt" in low:
+        if "chưa được kích hoạt" in low:
             print("Trang thai: Unactivated"); return Result(serial,"Unactivated","","")
+        if "không hợp lệ" in low:
+            print("Trang thai: Unactivated (serial loi)"); return Result(serial,"Unactivated","","")
         if "không thể hoàn thành" in low:
             print("Trang thai: Unknown"); return Result(serial,"Unknown","","")
 
-        # O /coverage nhung khong parse duoc -> dump (xem debug_last.txt)
-        print("Khong doc duoc ngay (xem file debug_last.txt, GUI minh file do):")
-        print(body[:400])
+        # Khong parse duoc -> dump
+        print("Khong doc duoc (xem debug_last.txt):")
+        print(body[:300])
         return Result(serial,"Unknown","","")
     except Exception as e:
         print("Loi:",e); return Result(serial,"ERROR","","")
