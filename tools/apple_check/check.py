@@ -62,6 +62,11 @@ def load_progress():
 def create_browser():
     o=webdriver.ChromeOptions()
     o.add_argument("--start-maximized"); o.add_argument("--disable-blink-features=AutomationControlled")
+    o.add_argument("--disable-popup-blocking")
+    # PROFILE CO DINH -> giu COOKIE captcha -> reload van khong bat captcha lai!
+    profile=os.path.join(os.getcwd(),"chrome_profile")
+    if not os.path.exists(profile): os.makedirs(profile,exist_ok=True)
+    o.add_argument(f"--user-data-dir={profile}")
     o.add_experimental_option("excludeSwitches",["enable-automation"])
     o.add_experimental_option("useAutomationExtension",False)
     d=webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=o)
@@ -173,12 +178,25 @@ def handle(driver,serial,i,total):
             except: pass
             return Result(serial,"ERROR","","")
 
-        # Dien serial + bam Gui, roi DUNG cho user nhap captcha
+        # Dien serial + bam Gui
         js_set(driver,el,serial)
         click_submit(driver)
-        input(">> Nhap captcha + bam Gui, roi an Enter o day...")
-        click_submit(driver)
-        time.sleep(1)
+        time.sleep(2)
+
+        # CO captcha hien khong? Neu KHONG (cookie con song) -> tu dong, KHOI nhap.
+        def has_captcha():
+            try:
+                t=driver.find_element(By.TAG_NAME,"body").text.lower()
+                cur=driver.current_url or ""
+                # con o form + co chu captcha = dang doi captcha
+                return ("captcha" in t and "sê-ri" in t and "/coverage" not in cur and "/error" not in cur)
+            except: return False
+
+        if has_captcha():
+            input(">> Co CAPTCHA: nhap + bam Gui, roi an Enter o day...")
+            click_submit(driver)
+            time.sleep(1)
+        # neu khong co captcha -> chay thang xuong doc ket qua (TU DONG)
 
         # CHO RA KHOI FORM: doi den khi URL doi sang /coverage hoac /error
         body=""; cur=""
