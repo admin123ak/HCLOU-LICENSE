@@ -154,19 +154,15 @@ def go_to_form(driver):
 
 def handle(driver,serial,i,total):
     try:
-        wait=WebDriverWait(driver,30)
+        wait=WebDriverWait(driver,20)
         print(f"\n({i}/{total}) Serial: {serial}")
-        # GIU PHIEN: thu bam 'Bat dau lai' ve form (KHONG reload -> captcha con song)
-        el=find_serial_input(driver,wait) if i>1 else None
-        if not el:
-            go_to_form(driver)
-            el=find_serial_input(driver,wait)
-        # neu van khong co form -> reload (se can captcha lai)
-        if not el:
+        # LUON reload ve form sach -> KHONG bao gio dung im (captcha nhap lai nhung chac chan)
+        try:
             driver.get(URL); time.sleep(1.5)
-            el=find_serial_input(driver,wait)
+        except: pass
+        el=find_serial_input(driver,wait)
         if not el:
-            print("Khong tim duoc o serial")
+            print("Khong tim duoc o serial (co the Apple chan IP -> doi VPN)")
             try: print("   [debug]",driver.current_url,"|",driver.title)
             except: pass
             return Result(serial,"ERROR","","")
