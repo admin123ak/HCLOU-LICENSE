@@ -12,11 +12,30 @@ PROGRESS_FILE="progress.json"; RESULT_FILE="results.xlsx"; INPUT_FILE="serials.x
 Result=namedtuple("Result",["serial","status","activation","expiry"])
 print("Apple Serial Checker")
 
+def clean_serial(s):
+    # Chuan hoa serial Apple: bo khoang trang, viet HOA.
+    # Neu la IMEI/chuoi dai (vd 'SK17Y930LW9' 11 ky tu) -> lay 10 KY TU CUOI.
+    s=str(s).strip().upper().replace(" ","")
+    s=re.sub(r"[^A-Z0-9]","",s)          # bo ky tu la
+    if len(s)>10:
+        s=s[-10:]                         # serial Apple = 10 ky tu cuoi
+    return s
+
 def read_serials(fp):
-    wb=openpyxl.load_workbook(fp); ws=wb.active; out=[]
-    for row in ws.iter_rows(min_row=2,max_col=1):
-        v=row[0].value
-        if isinstance(v,str) and v.strip(): out.append(v.strip())
+    wb=openpyxl.load_workbook(fp, data_only=True)
+    out=[]; seen=set()
+    # quet TAT CA sheet, lay serial o cot A (va cot B neu A la cong thuc/dai)
+    for ws in wb.worksheets:
+        for row in ws.iter_rows(min_row=1, max_col=2):
+            for cell in row:
+                v=cell.value
+                if isinstance(v,str):
+                    sv=v.strip()
+                    # bo o tieu de
+                    if not sv or "imei" in sv.lower() or sv.startswith("="): continue
+                    s=clean_serial(sv)
+                    if len(s)==10 and s not in seen:
+                        seen.add(s); out.append(s)
     return out
 
 def save_results(results,fp=RESULT_FILE):
