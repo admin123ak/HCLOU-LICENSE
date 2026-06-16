@@ -84,7 +84,7 @@ def smooth_scroll(driver,lines=6,delay=0.05):
 # ===== HAM TIM O SERIAL (CHI lay dung o serial, KHONG nham o search) =====
 def find_serial_input(driver, wait):
     # CHi nhung selector CHAC CHAN la o serial (tranh o globalnav search!)
-    end=time.time()+30
+    end=time.time()+12
     while time.time()<end:
         try:
             if driver.execute_script("return document.readyState")!="complete":
@@ -174,18 +174,15 @@ def handle(driver,serial,i,total):
     try:
         wait=WebDriverWait(driver,20)
         print(f"\n({i}/{total}) Serial: {serial}")
-        if i>1: time.sleep(random.uniform(1.5,3.5))   # nghi nhu nguoi that -> do bi chan IP
-        # GIU PHIEN (nhu code goc): KHONG reload moi serial -> Apple it nghi bot, do bi chan IP.
-        # Tim o form ngay; neu khong co -> bam 'Bat dau lai' ve form; cung duong moi reload.
+        if i>1: time.sleep(random.uniform(1.0,2.5))   # nghi nhu nguoi that
+        # Neu dang o trang KET QUA (/coverage,/error) -> ve form NGAY (khong tim o 30s vo ich)
+        try: cur=driver.current_url or ""
+        except: cur=""
+        if "/coverage" in cur or "/error" in cur or i==1:
+            if not go_to_form(driver):        # thu bam 'Bat dau lai' (giu phien)
+                driver.get(URL); time.sleep(2)  # khong co nut -> reload
         el=find_serial_input(driver,wait)
         if not el:
-            go_to_form(driver)                 # bam 'Bat dau lai' (giu phien)
-            el=find_serial_input(driver,wait)
-        if not el and i==1:
-            driver.get(URL); time.sleep(2)     # lan dau: vao trang
-            el=find_serial_input(driver,wait)
-        if not el:
-            # khong ve duoc form (co the ket qua truoc dang hien) -> thu reload 1 lan
             driver.get(URL); time.sleep(2)
             el=find_serial_input(driver,wait)
         if not el:
