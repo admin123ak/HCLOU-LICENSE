@@ -170,26 +170,33 @@ def go_to_form(driver):
         except: pass
     return False
 
-def handle(driver,serial,i,total):
+def handle(driver,serial,i,total,need_load):
     try:
         wait=WebDriverWait(driver,20)
         print(f"\n({i}/{total}) Serial: {serial}")
 
-        # 1) VE FORM nhap serial (reload trang form moi serial - don gian, chac chan)
-        driver.get(URL); time.sleep(2)
-        el=find_serial_input(driver,wait)
+        # 1) VE FORM nhap serial.
+        #    need_load=True (lan dau / sau khi doi VPN / loi) -> reload trang.
+        #    need_load=False -> bam 'Bat dau lai' GIU SESSION (khong mat captcha!).
+        el=None
+        if not need_load:
+            go_to_form(driver)                 # bam 'Bat dau lai' (giu phien)
+            el=find_serial_input(driver,wait)
+        if not el:
+            driver.get(URL); time.sleep(2)     # khong duoc -> reload
+            el=find_serial_input(driver,wait)
         if not el:
             print("  Khong tim duoc o serial (Apple chan IP? -> doi VPN).")
             ans=input("  >> Doi VPN xong Enter de thu lai | 's' bo qua: ").strip().lower()
-            if ans=="s": return Result(serial,"Error","","")
-            return handle(driver,serial,i,total)
+            if ans=="s": return Result(serial,"Error","",""),True
+            return handle(driver,serial,i,total,True)
 
         # 2) Dien serial
         js_set(driver,el,serial)
         smooth_scroll(driver,3,0.05)
 
-        # 3) USER: nhap captcha (neu co) + bam Gui, DOI ra ket qua, ROI Enter
-        input("  >> Nhap captcha + bam Gui, DOI ket qua hien ra, roi an Enter...")
+        # 3) USER: nhap captcha (chi lan dau / khi het han) + bam Gui, DOI ket qua, ROI Enter
+        input("  >> Nhap captcha (neu hien) + bam Gui, DOI ket qua, roi an Enter...")
 
         # 4) Doc ket qua (cho them toi 15s neu chua render)
         body=""; cur=""
@@ -210,41 +217,43 @@ def handle(driver,serial,i,total):
         try: open("debug_last.txt","w",encoding="utf-8").write(f"SERIAL:{serial}\nURL:{cur}\n---\n{body}")
         except: pass
 
-        # 5) Phan loai
+        # 5) Phan loai. Tra them co need_load cho serial SAU:
+        #    - error/chan IP -> True (phai reload)
+        #    - binh thuong -> False (serial sau bam 'Bat dau lai', GIU captcha)
         if "/error" in cur or "generic_error" in low:
             print("  !! Apple CHAN IP -> doi VPN.")
             ans=input("  >> Doi VPN xong Enter thu lai | 's' bo qua: ").strip().lower()
-            if ans=="s": return Result(serial,"Error","","")
-            return handle(driver,serial,i,total)
+            if ans=="s": return Result(serial,"Error","",""),True
+            return handle(driver,serial,i,total,True)
 
         dates=re.findall(r"(\d{1,2})\s+tháng\s+(\d{1,2}),?\s*(\d{4})",body,re.I)
         if dates:
             norm=[f"{int(d):02d}/{int(m):02d}/{y}" for d,m,y in dates]
             pur=norm[0]; exp=norm[1] if len(norm)>1 else ""
             print("  -> Activated | mua:",pur,"| het BH:",exp or "(het han)")
-            return Result(serial,"Activated",pur,exp)
+            return Result(serial,"Activated",pur,exp),False
         if "chưa được kích hoạt" in low or "không hợp lệ" in low:
-            print("  -> Unactivated"); return Result(serial,"Unactivated","","")
+            print("  -> Unactivated"); return Result(serial,"Unactivated","",""),False
         if "không thể hoàn thành" in low:
-            print("  -> Unknown"); return Result(serial,"Unknown","","")
+            print("  -> Unknown"); return Result(serial,"Unknown","",""),False
         print("  -> Unknown (xem debug_last.txt)"); print(body[:200])
-        return Result(serial,"Unknown","","")
+        return Result(serial,"Unknown","",""),False
     except Exception as e:
-        print("  Loi:",e); return Result(serial,"ERROR","","")
+        print("  Loi:",e); return Result(serial,"ERROR","",""),True
 
 def main():
     serials=read_serials(INPUT_FILE)
     if not serials: print("Khong co serial nao trong serials.xlsx (bat dau o A2)"); return
     print("Da nap",len(serials),"serial")
     i,results=load_progress(); d=create_browser()
-    d.get(URL); time.sleep(2)   # mo trang Apple ngay tu dau (khoi dung o data:,)
+    d.get(URL); time.sleep(2)   # mo trang Apple ngay tu dau
+    need_load=True              # serial dau tien: load trang
     while i<len(serials):
         try:
-            r=handle(d,serials[i],i+1,len(serials))
+            r,need_load=handle(d,serials[i],i+1,len(serials),need_load)
         except Exception as e:
             print("Loi handle:",e)
-            r=Result(serials[i],"ERROR","","")
-            # browser hong -> tao lai
+            r=Result(serials[i],"ERROR","",""); need_load=True
             try: d.quit()
             except: pass
             d=create_browser(); d.get(URL); time.sleep(2)
