@@ -170,54 +170,58 @@ def handle(driver,serial,i,total):
         js_set(driver,el,serial)
         click_submit(driver)
         input(">> Nhap captcha + bam Gui, roi an Enter o day...")
-        click_submit(driver)   # bam Gui ho phong khi user quen
-        time.sleep(1.5)
+        click_submit(driver)
+        time.sleep(1)
 
-        # Cho RA KHOI form: sang /coverage (ket qua) hoac /error (Apple chan)
+        # CHO RA KHOI FORM: doi den khi URL doi sang /coverage hoac /error
         body=""; cur=""
-        for _ in range(25):
+        for _ in range(30):
             try:
-                body=driver.find_element(By.TAG_NAME,"body").text
                 cur=driver.current_url or ""
-            except: body=""; cur=""
-            low=body.lower()
-            if "/coverage" in cur or "/error" in cur \
-               or re.search(r"\d{1,2}\s+tháng\s+\d{1,2},?\s*\d{4}", body, re.I) \
-               or "không hợp lệ" in low or "chưa được kích hoạt" in low:
+                body=driver.find_element(By.TAG_NAME,"body").text
+            except: cur=""; body=""
+            # da ra khoi form khi vao /coverage hoac /error
+            if "/coverage" in cur or "/error" in cur:
+                time.sleep(1.2)   # cho noi dung render xong
+                try: body=driver.find_element(By.TAG_NAME,"body").text
+                except: pass
                 break
             time.sleep(1)
         low=body.lower()
 
-        # === APPLE CHAN IP (trang /error hoac generic) -> doi VPN, thu lai ===
-        if "/error" in cur or "genericerror" in cur.lower() or "generic_error" in low:
-            print("!! Apple CHAN IP (trang error). Hay DOI Proton VPN sang nuoc khac.")
-            ans=input(">> Doi VPN xong an Enter de THU LAI serial nay | go 's' de bo qua (Error): ").strip().lower()
-            if ans=="s":
-                return Result(serial,"Error","","")
-            return handle(driver,serial,i,total)   # thu lai serial nay voi IP moi
+        # LUU trang ket qua ra file (de gui minh xem khi sai)
+        try:
+            open("debug_last.txt","w",encoding="utf-8").write(
+                f"SERIAL: {serial}\nURL: {cur}\n----BODY----\n{body}")
+        except: pass
 
-        # === UU TIEN NGAY (co ngay = Activated chac chan) ===
+        # === APPLE CHAN IP -> doi VPN, thu lai ===
+        if "/error" in cur or "generic_error" in low:
+            print("!! Apple CHAN IP. DOI Proton VPN sang nuoc khac.")
+            ans=input(">> Doi VPN xong an Enter de THU LAI | go 's' bo qua: ").strip().lower()
+            if ans=="s": return Result(serial,"Error","","")
+            return handle(driver,serial,i,total)
+
+        # Con o FORM (chua submit) -> Unknown, bao ro
+        if "/coverage" not in cur:
+            print("Chua ra ket qua (van o form). -> Unknown. Lan sau: bam Gui THAY ket qua roi moi Enter.")
+            return Result(serial,"Unknown","","")
+
+        # === O trang /coverage: doc ket qua ===
         dates=re.findall(r"(\d{1,2})\s+tháng\s+(\d{1,2}),?\s*(\d{4})", body, re.I)
         if dates:
             norm=[f"{int(d):02d}/{int(m):02d}/{y}" for d,m,y in dates]
             pur=norm[0]; exp=norm[1] if len(norm)>1 else ""
-            print("Trang thai: Activated | mua:",pur,"| het BH:",exp or "(het han/khong co)")
+            print("Trang thai: Activated | mua:",pur,"| het BH:",exp or "(het han)")
             return Result(serial,"Activated",pur,exp)
-        if "không thể hoàn thành" in low:
-            print("Trang thai: Unknown (Apple chan)"); return Result(serial,"Unknown","","")
-        # Chua kich hoat: chi khi RA KHOI form (tranh doc nham trang form)
-        if ("không hợp lệ" in low or "chưa được kích hoạt" in low) and "captcha" not in low:
+        if "không hợp lệ" in low or "chưa được kích hoạt" in low:
             print("Trang thai: Unactivated"); return Result(serial,"Unactivated","","")
-        # Van con o form (chua submit kip) -> coi nhu Unknown
-        if "captcha" in low and "nhập số sê-ri" in low:
-            print("Trang thai: Unknown (chua ra ket qua - co the chua bam Gui)")
-            return Result(serial,"Unknown","","")
+        if "không thể hoàn thành" in low:
+            print("Trang thai: Unknown"); return Result(serial,"Unknown","","")
 
-        # Khong doc duoc -> dump de gui lai cho minh
-        print("Khong xac dinh. GUI lai doan duoi cho minh:")
-        print("----- BODY -----")
-        print(body[:500])
-        print("----------------")
+        # O /coverage nhung khong parse duoc -> dump (xem debug_last.txt)
+        print("Khong doc duoc ngay (xem file debug_last.txt, GUI minh file do):")
+        print(body[:400])
         return Result(serial,"Unknown","","")
     except Exception as e:
         print("Loi:",e); return Result(serial,"ERROR","","")
