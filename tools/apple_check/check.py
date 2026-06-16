@@ -157,62 +157,55 @@ def handle(driver,serial,i,total):
     try:
         wait=WebDriverWait(driver,30)
         print(f"\n({i}/{total}) Serial: {serial}")
-        # 0) Dam bao dang o TRANG APPLE (neu dang data:, blank, trang khac -> mo lai)
-        try: cur=driver.current_url or ""
-        except: cur=""
-        if "checkcoverage.apple.com" not in cur:
-            driver.get(URL); time.sleep(2)
-        # 1) Dam bao dang o FORM nhap serial (giu phien, khong reload)
+        # FORM SACH moi serial (tranh doc nham ket qua serial truoc)
+        driver.get(URL); time.sleep(1.5)
         el=find_serial_input(driver,wait)
         if not el:
-            go_to_form(driver)              # thu bam 'kiem tra san pham khac'
-            el=find_serial_input(driver,wait)
-        if not el:
-            driver.get(URL)                 # cung duong -> reload (se can captcha lai)
-            el=find_serial_input(driver,wait)
-        if not el:
-            print("Khong tim duoc o serial"); return Result(serial,"ERROR","","")
+            print("Khong tim duoc o serial")
+            try: print("   [debug]",driver.current_url,"|",driver.title)
+            except: pass
+            return Result(serial,"ERROR","","")
 
-        # 2) Dien serial + bam Gui
+        # Dien serial + bam Gui, roi DUNG cho user nhap captcha
         js_set(driver,el,serial)
         click_submit(driver)
+        input(">> Nhap captcha + bam Gui, roi an Enter o day...")
 
-        # 3) Cho ket qua 6s. Neu RA ket qua -> tu dong (khong can captcha).
-        auto=False
-        for _ in range(6):
+        # Cho sang trang ket qua /coverage (toi da 25s)
+        body=""
+        for _ in range(25):
+            try:
+                body=driver.find_element(By.TAG_NAME,"body").text
+                cur=driver.current_url or ""
+            except:
+                body=""; cur=""
+            low=body.lower()
+            if ("/coverage" in cur
+                or re.search(r"\d{1,2}\s+tháng\s+\d{1,2},?\s*\d{4}", body, re.I)
+                or "không hợp lệ" in low or "chưa được kích hoạt" in low
+                or "không thể hoàn thành" in low):
+                break
             time.sleep(1)
-            if result_ready(driver): auto=True; break
-        # 4) Chua ra -> co captcha -> nho user nhap
-        if not auto:
-            input(">> Co CAPTCHA: nhap captcha + bam Gui, roi an Enter (neu da ra ket qua thi cu Enter)...")
-            click_submit(driver)
-            for _ in range(20):
-                if result_ready(driver): break
-                time.sleep(1)
-
-        body=driver.find_element(By.TAG_NAME,"body").text
         low=body.lower()
 
-        # Apple chan / loi tam thoi
+        # === UU TIEN NGAY (co ngay = Activated chac chan) ===
+        dates=re.findall(r"(\d{1,2})\s+tháng\s+(\d{1,2}),?\s*(\d{4})", body, re.I)
+        if dates:
+            norm=[f"{int(d):02d}/{int(m):02d}/{y}" for d,m,y in dates]
+            pur=norm[0]; exp=norm[1] if len(norm)>1 else ""
+            print("Trang thai: Activated | mua:",pur,"| het BH:",exp or "(het han/khong co)")
+            return Result(serial,"Activated",pur,exp)
+        # Apple chan
         if "không thể hoàn thành" in low:
             print("Trang thai: Unknown (Apple chan)"); return Result(serial,"Unknown","","")
-        # Chua kich hoat
+        # Chua kich hoat (chi khi KHONG co ngay)
         if "không hợp lệ" in low or "chưa được kích hoạt" in low:
             print("Trang thai: Unactivated"); return Result(serial,"Unactivated","","")
 
-        # Tim TAT CA ngay dang "16 tháng 9, 2025" tren toan trang
-        dates=re.findall(r"(\d{1,2})\s+tháng\s+(\d{1,2}),?\s*(\d{4})", body, re.I)
-        norm=[f"{int(d):02d}/{int(m):02d}/{y}" for d,m,y in dates]
-        if norm:
-            pur=norm[0]
-            exp=norm[1] if len(norm)>1 else ""
-            print("Trang thai: Activated | mua:",pur,"| het BH:",exp or "(het han/khong co)")
-            return Result(serial,"Activated",pur,exp)
-
-        # Khong doc duoc -> in 1 doan body de gui lai cho minh chinh selector
-        print("Khong xac dinh. Noi dung trang (gui lai doan nay neu sai):")
+        # Khong doc duoc -> dump de gui lai cho minh
+        print("Khong xac dinh. GUI lai doan duoi cho minh:")
         print("----- BODY -----")
-        print(body[:400])
+        print(body[:500])
         print("----------------")
         return Result(serial,"Unknown","","")
     except Exception as e:
