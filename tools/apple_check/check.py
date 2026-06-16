@@ -207,22 +207,31 @@ def handle(driver,serial,i,total,need_load):
         js_set(driver,el,serial)
         smooth_scroll(driver,3,0.05)
 
-        # 3) USER: nhap captcha (chi lan dau / khi het han) + bam Gui, DOI ket qua, ROI Enter
-        input("  >> Nhap captcha (neu hien) + bam Gui, DOI ket qua, roi an Enter...")
+        # 3) USER: nhap captcha + bam Gui, DOI ket qua, ROI Enter
+        input("  >> Nhap captcha + bam Gui, DOI ket qua hien, roi an Enter...")
 
-        # 4) Doc ket qua (cho them toi 15s neu chua render)
-        body=""; cur=""
-        for _ in range(15):
-            try:
-                cur=driver.current_url or ""
-                body=driver.find_element(By.TAG_NAME,"body").text
-            except: body=""
+        # 4) Doc ket qua. Neu VAN o form (chua submit) -> nhac bam Gui + cho lai.
+        def get_state():
+            try: return (driver.current_url or ""), driver.find_element(By.TAG_NAME,"body").text
+            except: return "",""
+        def is_result(cur,body):
             low=body.lower()
-            if re.search(r"\d{1,2}\s+tháng\s+\d{1,2},?\s*\d{4}",body,re.I) \
-               or "chưa được kích hoạt" in low or "không hợp lệ" in low \
-               or "không thể hoàn thành" in low or "/error" in cur:
+            return bool(re.search(r"\d{1,2}\s+tháng\s+\d{1,2},?\s*\d{4}",body,re.I)
+                        or "chưa được kích hoạt" in low or "không hợp lệ" in low
+                        or "không thể hoàn thành" in low or "/error" in cur)
+        body=""; cur=""
+        for attempt in range(3):                      # toi da nhac 3 lan
+            for _ in range(12):
+                cur,body=get_state()
+                if is_result(cur,body): break
+                time.sleep(1)
+            if is_result(cur,body): break
+            # van o form -> con chu CAPTCHA/Gui -> nhac bam Gui
+            low=body.lower()
+            if "captcha" in low or "gửi" in low or "sê-ri" in low:
+                input("  >> Trang CHUA ra ket qua. Bam nut GUI tren trang -> doi hien ket qua -> Enter lai...")
+            else:
                 break
-            time.sleep(1)
         low=body.lower()
 
         # luu trang de debug khi can
