@@ -1,5 +1,5 @@
 # Apple Serial Checker - ban da sua selector (id serial-number-input moi)
-import os, time, json, re, openpyxl
+import os, time, json, re, random, openpyxl
 from collections import namedtuple
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -167,11 +167,20 @@ def handle(driver,serial,i,total):
     try:
         wait=WebDriverWait(driver,20)
         print(f"\n({i}/{total}) Serial: {serial}")
-        # LUON reload ve form sach -> KHONG bao gio dung im (captcha nhap lai nhung chac chan)
-        try:
-            driver.get(URL); time.sleep(1.5)
-        except: pass
+        if i>1: time.sleep(random.uniform(1.5,3.5))   # nghi nhu nguoi that -> do bi chan IP
+        # GIU PHIEN (nhu code goc): KHONG reload moi serial -> Apple it nghi bot, do bi chan IP.
+        # Tim o form ngay; neu khong co -> bam 'Bat dau lai' ve form; cung duong moi reload.
         el=find_serial_input(driver,wait)
+        if not el:
+            go_to_form(driver)                 # bam 'Bat dau lai' (giu phien)
+            el=find_serial_input(driver,wait)
+        if not el and i==1:
+            driver.get(URL); time.sleep(2)     # lan dau: vao trang
+            el=find_serial_input(driver,wait)
+        if not el:
+            # khong ve duoc form (co the ket qua truoc dang hien) -> thu reload 1 lan
+            driver.get(URL); time.sleep(2)
+            el=find_serial_input(driver,wait)
         if not el:
             print("Khong tim duoc o serial (co the Apple chan IP -> doi VPN)")
             try: print("   [debug]",driver.current_url,"|",driver.title)
