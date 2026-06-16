@@ -42,7 +42,13 @@ def save_results(results,fp=RESULT_FILE):
     wb=openpyxl.Workbook(); ws=wb.active
     ws.append(['Serial','Status','Ngay kich hoat','Ngay het BH'])
     for r in results: ws.append([r.serial,r.status,r.activation,r.expiry])
-    wb.save(fp); print("Da luu",fp)
+    # Neu file dang MO trong Excel -> luu file phu, KHONG crash
+    try:
+        wb.save(fp); print("Da luu",fp)
+    except PermissionError:
+        alt="results_tam.xlsx"
+        try: wb.save(alt); print("!! results.xlsx dang MO -> luu tam vao",alt,"(dong Excel ra de luu dung file)")
+        except: print("!! Khong luu duoc Excel (dang mo file?). Ket qua van giu trong progress.")
 
 def save_progress(i,results):
     json.dump({"index":i,"results":[r._asdict() for r in results]},open(PROGRESS_FILE,"w",encoding="utf-8"),ensure_ascii=False)
@@ -235,13 +241,20 @@ def main():
     d.get(URL); time.sleep(2)   # mo trang Apple ngay tu dau (khoi dung o data:,)
     while i<len(serials):
         try:
-            results.append(handle(d,serials[i],i+1,len(serials))); i+=1; save_progress(i,results)
-            if len(results)%5==0: save_results(results)
+            r=handle(d,serials[i],i+1,len(serials))
         except Exception as e:
-            print("Loi vong lap:",e)
+            print("Loi handle:",e)
+            r=Result(serials[i],"ERROR","","")
+            # browser hong -> tao lai
             try: d.quit()
             except: pass
-            d=create_browser()
+            d=create_browser(); d.get(URL); time.sleep(2)
+        results.append(r); i+=1
+        try: save_progress(i,results)
+        except: pass
+        if len(results)%10==0:
+            try: save_results(results)
+            except: pass
     try: d.quit()
     except: pass
     save_results(results)
