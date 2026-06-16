@@ -170,23 +170,31 @@ def handle(driver,serial,i,total):
         js_set(driver,el,serial)
         click_submit(driver)
         input(">> Nhap captcha + bam Gui, roi an Enter o day...")
+        click_submit(driver)   # bam Gui ho phong khi user quen
+        time.sleep(1.5)
 
-        # Cho sang trang ket qua /coverage (toi da 25s)
-        body=""
+        # Cho RA KHOI form: sang /coverage (ket qua) hoac /error (Apple chan)
+        body=""; cur=""
         for _ in range(25):
             try:
                 body=driver.find_element(By.TAG_NAME,"body").text
                 cur=driver.current_url or ""
-            except:
-                body=""; cur=""
+            except: body=""; cur=""
             low=body.lower()
-            if ("/coverage" in cur
-                or re.search(r"\d{1,2}\s+tháng\s+\d{1,2},?\s*\d{4}", body, re.I)
-                or "không hợp lệ" in low or "chưa được kích hoạt" in low
-                or "không thể hoàn thành" in low):
+            if "/coverage" in cur or "/error" in cur \
+               or re.search(r"\d{1,2}\s+tháng\s+\d{1,2},?\s*\d{4}", body, re.I) \
+               or "không hợp lệ" in low or "chưa được kích hoạt" in low:
                 break
             time.sleep(1)
         low=body.lower()
+
+        # === APPLE CHAN IP (trang /error hoac generic) -> doi VPN, thu lai ===
+        if "/error" in cur or "genericerror" in cur.lower() or "generic_error" in low:
+            print("!! Apple CHAN IP (trang error). Hay DOI Proton VPN sang nuoc khac.")
+            ans=input(">> Doi VPN xong an Enter de THU LAI serial nay | go 's' de bo qua (Error): ").strip().lower()
+            if ans=="s":
+                return Result(serial,"Error","","")
+            return handle(driver,serial,i,total)   # thu lai serial nay voi IP moi
 
         # === UU TIEN NGAY (co ngay = Activated chac chan) ===
         dates=re.findall(r"(\d{1,2})\s+tháng\s+(\d{1,2}),?\s*(\d{4})", body, re.I)
@@ -195,12 +203,15 @@ def handle(driver,serial,i,total):
             pur=norm[0]; exp=norm[1] if len(norm)>1 else ""
             print("Trang thai: Activated | mua:",pur,"| het BH:",exp or "(het han/khong co)")
             return Result(serial,"Activated",pur,exp)
-        # Apple chan
         if "không thể hoàn thành" in low:
             print("Trang thai: Unknown (Apple chan)"); return Result(serial,"Unknown","","")
-        # Chua kich hoat (chi khi KHONG co ngay)
-        if "không hợp lệ" in low or "chưa được kích hoạt" in low:
+        # Chua kich hoat: chi khi RA KHOI form (tranh doc nham trang form)
+        if ("không hợp lệ" in low or "chưa được kích hoạt" in low) and "captcha" not in low:
             print("Trang thai: Unactivated"); return Result(serial,"Unactivated","","")
+        # Van con o form (chua submit kip) -> coi nhu Unknown
+        if "captcha" in low and "nhập số sê-ri" in low:
+            print("Trang thai: Unknown (chua ra ket qua - co the chua bam Gui)")
+            return Result(serial,"Unknown","","")
 
         # Khong doc duoc -> dump de gui lai cho minh
         print("Khong xac dinh. GUI lai doan duoi cho minh:")
