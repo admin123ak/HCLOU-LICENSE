@@ -92,6 +92,75 @@ def find_date(line):
     if m: d,mt,y=m.groups(); return f"{int(d):02d}/{int(mt):02d}/{y}"
     return line.strip()
 
+# ===== AUTO CAPTCHA (ddddocr - OCR free) =====
+try:
+    import ddddocr
+    _ocr=ddddocr.DdddOcr(show_ad=False)
+    AUTO_CAPTCHA=True
+except Exception:
+    _ocr=None; AUTO_CAPTCHA=False
+    print("!! Chua cai ddddocr -> se nhap captcha tay. Cai: pip install ddddocr")
+
+def _find(driver, pairs):
+    for by,val in pairs:
+        try:
+            el=driver.find_element(by,val)
+            if el and el.is_displayed(): return el
+        except: pass
+    return None
+
+def find_captcha_img(driver):
+    return _find(driver,[
+        (By.CSS_SELECTOR,"img[src*='captcha']"),
+        (By.CSS_SELECTOR,"img[alt*='captcha' i]"),
+        (By.XPATH,"//img[contains(@id,'captcha') or contains(@class,'captcha')]"),
+        (By.XPATH,"//*[contains(@class,'captcha')]//img"),
+        (By.CSS_SELECTOR,"img[src^='data:image']"),
+    ])
+def find_captcha_input(driver):
+    return _find(driver,[
+        (By.ID,"captcha-input"),
+        (By.CSS_SELECTOR,"input[name*='captcha' i]"),
+        (By.CSS_SELECTOR,"input[aria-label*='captcha' i]"),
+        (By.XPATH,"//input[contains(@id,'captcha')]"),
+        (By.XPATH,"//input[@maxlength='4' or @maxlength='5' or @maxlength='6']"),
+    ])
+def find_continue(driver):
+    return _find(driver,[
+        (By.XPATH,"//button[contains(.,'Tiếp tục') or contains(.,'Continue') or contains(.,'Tiep tuc')]"),
+        (By.ID,"continue-button"),
+        (By.CSS_SELECTOR,"button[type='submit']"),
+    ])
+
+def solve_captcha_auto(driver,serial_el,serial):
+    """Tu giai captcha bang ddddocr, thu toi 4 lan. True=qua, False=khong giai duoc -> fallback tay."""
+    for attempt in range(4):
+        img=find_captcha_img(driver); cin=find_captcha_input(driver)
+        if not img or not cin:
+            return None  # khong tim thay element -> bao goi nhap tay
+        try: png=img.screenshot_as_png
+        except Exception: return None
+        text=re.sub(r'[^A-Za-z0-9]','',_ocr.classification(png) or '')
+        if not text:
+            time.sleep(1); continue
+        print(f"   captcha OCR (lan {attempt+1}): {text}")
+        js_set(driver,cin,text)
+        btn=find_continue(driver)
+        if btn:
+            try: btn.click()
+            except Exception:
+                try: driver.execute_script("arguments[0].click()",btn)
+                except Exception: pass
+        time.sleep(3)
+        # Qua duoc khi: khong con o captcha nua (da sang trang ket qua)
+        if find_captcha_img(driver) is None:
+            return True
+        # Sai -> trang reload captcha moi; dien lai serial neu o serial xuat hien lai
+        s2=find_serial_input(driver,None)
+        if s2: js_set(driver,s2,serial)
+        time.sleep(1)
+    return False
+
 def handle(driver,serial,i,total):
     try:
         driver.get("https://checkcoverage.apple.com/?locale=vi_VN")
@@ -101,7 +170,12 @@ def handle(driver,serial,i,total):
         if not el:
             print("Khong tim duoc o serial"); return Result(serial,"ERROR","","","")
         js_set(driver,el,serial)
-        input(">> Nhap captcha & bam Tiep tuc, roi an Enter o day...")
+        # Tu giai captcha; neu khong duoc -> nhap tay (fallback)
+        ok=solve_captcha_auto(driver,el,serial) if AUTO_CAPTCHA else None
+        if ok is not True:
+            if ok is None: print("   (Khong tu tim/giai duoc captcha — nhap tay)")
+            else: print("   (OCR sai 4 lan — nhap tay)")
+            input(">> Nhap captcha & bam Tiep tuc, roi an Enter o day...")
         body=driver.find_element(By.TAG_NAME,"body").text.lower()
         if "ngày mua không hợp lệ" in body or "thiết bị chưa được kích hoạt" in body:
             print("Trang thai: Unactivated"); return Result(serial,"Unactivated",find_model(driver),"","")
