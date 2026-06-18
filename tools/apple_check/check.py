@@ -306,6 +306,14 @@ def solve_captcha_auto(driver,serial_el,serial):
         time.sleep(random.uniform(1.0,2.0))
     return False
 
+def looks_banned(driver):
+    """Phat hien trang bi BAN/CHAN (Apple/Akamai)."""
+    try: b=driver.find_element(By.TAG_NAME,"body").text.lower()
+    except: return False
+    return any(k in b for k in [
+        "access denied","forbidden","reference #","unusual activity","too many requests",
+        "đã bị chặn","quá nhiều yêu cầu","akamai","error 16","blocked","captcha không thể"])
+
 def handle(driver,serial,i,total):
     try:
         driver.get("https://checkcoverage.apple.com/?locale=vi_VN")
@@ -313,6 +321,9 @@ def handle(driver,serial,i,total):
         print(f"\n({i}/{total}) Serial: {serial}")
         el=find_serial_input(driver,wait)
         if not el:
+            # Khong thay o serial -> rat co the bi BAN/CHAN IP
+            if looks_banned(driver):
+                print("   !! Co dau hieu BI BAN/CHAN"); return Result(serial,"BANNED","","","")
             print("Khong tim duoc o serial"); return Result(serial,"ERROR","","","")
         js_set(driver,el,serial)
         # Tu giai captcha; neu khong duoc -> nhap tay (fallback)
@@ -365,6 +376,24 @@ def main():
                 time.sleep(random.uniform(3,6))
 
             r=handle(d,serials[i],i+1,len(serials))
+
+            # Bi BAN -> doi IP NGAY + thu lai chinh serial nay (khong tinh la da check)
+            if r.status=="BANNED":
+                print("   !! BI BAN -> doi IP ngay roi thu lai serial nay")
+                try: d.quit()
+                except: pass
+                if PROXY_API_URL:
+                    new=fetch_rotating_proxy()
+                    if new: cur_proxy=new
+                elif PROXY:
+                    time.sleep(random.uniform(2,4))
+                else:
+                    print(">>> BI BAN! DOI SERVER Proton VPN -> roi an Enter...")
+                    input()
+                d=create_browser(cur_proxy); done_on_ip=0
+                time.sleep(random.uniform(3,6))
+                continue   # KHONG tang i -> check lai serial nay tren IP moi
+
             results.append(r); i+=1; done_on_ip+=1
             save_progress(i,results)
             save_results(results)              # LUU NGAY sau moi serial hoan thanh
