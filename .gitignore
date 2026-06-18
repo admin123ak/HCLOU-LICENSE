@@ -125,3 +125,5 @@ nb-configuration.xml
 /phpunit*.xml
 /.phpunit.*.cache
 
+tools/apple_check/__pycache__/
+*.pyc
