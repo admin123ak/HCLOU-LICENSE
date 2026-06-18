@@ -140,6 +140,9 @@ def create_browser(proxy=None):
         d=webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=Opt)
         try: d.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument",{"source":"Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"})
         except: pass
+    # Chong treo vo han khi proxy cham/chet
+    try: d.set_page_load_timeout(45)
+    except: pass
     return d
 
 def human_pause(driver):
@@ -150,7 +153,7 @@ def human_pause(driver):
     time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
 
 # ===== HAM DA SUA: selector dung voi trang Apple moi (Next.js) =====
-def find_serial_input(driver, wait):
+def find_serial_input(driver, wait=None, timeout=30):
     strategies=[
         (By.ID,"serial-number-input"),
         (By.CSS_SELECTOR,"input.form-textbox-input"),
@@ -158,7 +161,7 @@ def find_serial_input(driver, wait):
         (By.XPATH,"//input[contains(@aria-label,'sê-ri')]"),
         (By.XPATH,"//input[@type='text' and @required]"),
     ]
-    end=time.time()+30
+    end=time.time()+timeout
     while time.time()<end:
         for by,val in strategies:
             try:
@@ -301,7 +304,7 @@ def solve_captcha_auto(driver,serial_el,serial):
         res=submit_and_wait(driver)     # gui + doi ket qua that
         if res=="done": return True
         # sai -> trang lam moi captcha; dien lai serial neu o serial hien lai
-        s2=find_serial_input(driver,None)
+        s2=find_serial_input(driver,timeout=3)
         if s2 and (s2.get_attribute("value") or "")!=serial: js_set(driver,s2,serial)
         time.sleep(random.uniform(1.0,2.0))
     return False
@@ -316,10 +319,14 @@ def looks_banned(driver):
 
 def handle(driver,serial,i,total):
     try:
-        driver.get("https://checkcoverage.apple.com/?locale=vi_VN")
-        wait=WebDriverWait(driver,60)
         print(f"\n({i}/{total}) Serial: {serial}")
-        el=find_serial_input(driver,wait)
+        try:
+            driver.get("https://checkcoverage.apple.com/?locale=vi_VN")
+        except Exception:
+            # page load timeout (proxy cham) -> coi nhu can doi IP
+            try: driver.execute_script("window.stop();")
+            except: pass
+        el=find_serial_input(driver,timeout=30)
         if not el:
             # Khong thay o serial -> rat co the bi BAN/CHAN IP
             if looks_banned(driver):
