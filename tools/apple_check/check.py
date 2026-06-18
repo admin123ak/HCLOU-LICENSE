@@ -1,15 +1,33 @@
 # Apple Serial Checker - ban da sua selector (id serial-number-input moi)
-import os, time, json, re, openpyxl
+import os, time, json, re, random, openpyxl
 from collections import namedtuple
 from openpyxl.styles import PatternFill, Font
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+
+# undetected-chromedriver: qua mat bot-detection cua Apple (Akamai)
+try:
+    import undetected_chromedriver as uc
+    HAS_UC=True
+except Exception:
+    HAS_UC=False
+    from selenium.webdriver.chrome.service import Service
+    from webdriver_manager.chrome import ChromeDriverManager
+    print("!! Chua cai undetected-chromedriver -> de bi ban hon. Cai: pip install undetected-chromedriver")
 
 PROGRESS_FILE="progress.json"; RESULT_FILE="results.xlsx"; INPUT_FILE="serials.xlsx"
+
+# ===== CHONG BAN (free) =====
+BATCH_PER_IP=6          # check bao nhieu serial thi DOI IP (doi server VPN)
+DELAY_MIN, DELAY_MAX=6, 14   # nghi ngau nhien giua moi serial (giay) - giong nguoi
+UAS=[
+ "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+ "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+ "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+ "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+]
 Result=namedtuple("Result",["serial","status","model","activation","expiry"])
 print("Apple Serial Checker")
 
@@ -44,14 +62,30 @@ def load_progress():
     return 0,[]
 
 def create_browser():
-    o=webdriver.ChromeOptions()
-    o.add_argument("--start-maximized"); o.add_argument("--disable-blink-features=AutomationControlled")
-    o.add_experimental_option("excludeSwitches",["enable-automation"])
-    o.add_experimental_option("useAutomationExtension",False)
-    d=webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=o)
-    try: d.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument",{"source":"Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"})
-    except: pass
+    ua=random.choice(UAS)
+    if HAS_UC:
+        o=uc.ChromeOptions()
+        o.add_argument("--start-maximized")
+        o.add_argument("--user-agent="+ua)
+        o.add_argument("--lang=vi-VN")
+        d=uc.Chrome(options=o)
+    else:
+        o=webdriver.ChromeOptions()
+        o.add_argument("--start-maximized"); o.add_argument("--disable-blink-features=AutomationControlled")
+        o.add_argument("--user-agent="+ua)
+        o.add_experimental_option("excludeSwitches",["enable-automation"])
+        o.add_experimental_option("useAutomationExtension",False)
+        d=webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=o)
+        try: d.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument",{"source":"Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"})
+        except: pass
     return d
+
+def human_pause(driver):
+    """Cuon trang + di chuot ngau nhien (giong nguoi) + nghi ngau nhien."""
+    try:
+        driver.execute_script("window.scrollBy(0,%d);" % random.randint(80,300))
+    except: pass
+    time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
 
 # ===== HAM DA SUA: selector dung voi trang Apple moi (Next.js) =====
 def find_serial_input(driver, wait):
@@ -195,16 +229,32 @@ def main():
     serials=read_serials(INPUT_FILE)
     if not serials: print("Khong co serial nao trong serials.xlsx (bat dau o A2)"); return
     print("Da nap",len(serials),"serial")
-    i,results=load_progress(); d=create_browser()
+    i,results=load_progress()
+    print(f">> Chong ban: doi IP moi {BATCH_PER_IP} serial, nghi {DELAY_MIN}-{DELAY_MAX}s/serial, undetected={'BAT' if HAS_UC else 'TAT'}")
+    d=create_browser()
+    done_on_ip=0
     while i<len(serials):
         try:
-            results.append(handle(d,serials[i],i+1,len(serials))); i+=1; save_progress(i,results)
+            # Doi IP sau moi lo: dong browser -> nhac doi server VPN -> browser moi (fingerprint moi)
+            if done_on_ip>=BATCH_PER_IP:
+                try: d.quit()
+                except: pass
+                print(f"\n>>> Da check {BATCH_PER_IP} serial tren IP nay.")
+                print(">>> DOI SERVER Proton VPN (de doi IP) -> roi an Enter de chay tiep...")
+                input()
+                d=create_browser(); done_on_ip=0
+                time.sleep(random.uniform(3,6))
+
+            results.append(handle(d,serials[i],i+1,len(serials))); i+=1; done_on_ip+=1
+            save_progress(i,results)
             if len(results)%5==0: save_results(results)
+            if i<len(serials): human_pause(d)   # nghi ngau nhien giong nguoi
         except Exception as e:
             print("Loi vong lap:",e)
             try: d.quit()
             except: pass
-            d=create_browser()
+            time.sleep(random.uniform(3,6))
+            d=create_browser(); done_on_ip=0
     try: d.quit()
     except: pass
     save_results(results)
