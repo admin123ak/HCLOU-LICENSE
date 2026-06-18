@@ -20,12 +20,34 @@ except Exception:
 PROGRESS_FILE="progress.json"; RESULT_FILE="results.xlsx"; INPUT_FILE="serials.xlsx"
 
 # ===== CHONG BAN =====
-# PROXY XOAY: dien proxy vao day -> tu doi IP, KHONG can dung VPN tay.
-#   Dinh dang: "host:port"  hoac  "user:pass@host:port"  (http proxy)
-#   De TRONG "" -> dung Proton VPN (tool se nhac doi server moi BATCH_PER_IP serial)
+# ===== PROXY XOAY (proxy VN co API doi IP chu dong) =====
+#   PROXY: endpoint proxy co dinh    "host:port"  hoac  "user:pass@host:port"
+#   PROXY_CHANGE_URL: link API doi IP cua nha cung cap (vd https://.../changeIP?key=XXX)
+#   De TRONG ca 2 -> dung Proton VPN tay.
 PROXY=""
-BATCH_PER_IP=6          # check bao nhieu serial thi DOI IP (chi khi dung VPN tay)
+PROXY_CHANGE_URL=""        # link API doi IP (goi -> proxy doi sang IP moi)
+PROXY_CHANGE_MIN_SEC=62    # khong goi doi IP nhanh hon nay (goi proxy gioi han 60s)
+
+BATCH_PER_IP=6          # check bao nhieu serial thi DOI IP
 DELAY_MIN, DELAY_MAX=6, 14   # nghi ngau nhien giua moi serial (giay) - giong nguoi
+
+_last_ip_change=[0.0]
+def change_ip():
+    """Goi API doi IP cua proxy, ton trong gioi han 60s giua 2 lan."""
+    if not PROXY_CHANGE_URL: return False
+    wait=PROXY_CHANGE_MIN_SEC-(time.time()-_last_ip_change[0])
+    if wait>0:
+        print(f"   (cho {int(wait)}s cho du gioi han doi IP {PROXY_CHANGE_MIN_SEC}s)...")
+        time.sleep(wait+0.5)
+    try:
+        import requests
+        r=requests.get(PROXY_CHANGE_URL,timeout=30)
+        print("   >> doi IP:",(r.text or "")[:140].replace("\n"," "))
+        _last_ip_change[0]=time.time()
+        time.sleep(6)  # cho IP moi san sang
+        return True
+    except Exception as e:
+        print("   !! loi goi API doi IP:",e); return False
 UAS=[
  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
@@ -253,12 +275,19 @@ def solve_captcha_auto(driver,serial_el,serial):
         img=find_captcha_img(driver); cin=find_captcha_input(driver,serial_el)
         if not img or not cin:
             return None
+        # Tu cuon xuong cho anh + o captcha (giong nguoi, chac chan thay)
+        try:
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
+            time.sleep(random.uniform(0.5,1.0))
+        except: pass
         try: png=img.screenshot_as_png
         except Exception: return None
         text=re.sub(r'[^A-Za-z0-9]','',_ocr.classification(png) or '')
         if not text:
             time.sleep(1.2); continue
         print(f"   captcha OCR (lan {attempt+1}): {text}")
+        try: driver.execute_script("arguments[0].scrollIntoView({block:'center'});", cin)
+        except: pass
         human_type(cin,text)            # go cham vao DUNG o captcha
         res=submit_and_wait(driver)     # gui + doi ket qua that
         if res=="done": return True
@@ -303,7 +332,7 @@ def main():
     if not serials: print("Khong co serial nao trong serials.xlsx (bat dau o A2)"); return
     print("Da nap",len(serials),"serial")
     i,results=load_progress()
-    mode = "PROXY xoay" if PROXY else "VPN tay"
+    mode = ("PROXY+API doi IP" if PROXY_CHANGE_URL else "PROXY") if PROXY else "VPN tay"
     print(f">> Chong ban: IP={mode} | doi IP moi {BATCH_PER_IP} serial | nghi {DELAY_MIN}-{DELAY_MAX}s/serial | undetected={'BAT' if HAS_UC else 'TAT'}")
     d=create_browser()
     done_on_ip=0
@@ -313,12 +342,13 @@ def main():
             if done_on_ip>=BATCH_PER_IP:
                 try: d.quit()
                 except: pass
-                if PROXY:
-                    # Proxy xoay -> mo browser moi = IP moi tu dong, KHONG can dung tay
-                    print(f"\n>>> Da check {BATCH_PER_IP} serial -> doi IP qua proxy (tu dong)...")
+                print(f"\n>>> Da check {BATCH_PER_IP} serial tren IP nay.")
+                if PROXY_CHANGE_URL:
+                    change_ip()                 # goi API doi IP (tu dong, ton trong 60s)
+                elif PROXY:
+                    print(">>> (Proxy khong co API doi IP — mo lai browser)")
                     time.sleep(random.uniform(2,4))
                 else:
-                    print(f"\n>>> Da check {BATCH_PER_IP} serial tren IP nay.")
                     print(">>> DOI SERVER Proton VPN (de doi IP) -> roi an Enter de chay tiep...")
                     input()
                 d=create_browser(); done_on_ip=0
