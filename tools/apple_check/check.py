@@ -20,34 +20,43 @@ except Exception:
 PROGRESS_FILE="progress.json"; RESULT_FILE="results.xlsx"; INPUT_FILE="serials.xlsx"
 
 # ===== CHONG BAN =====
-# ===== PROXY XOAY (proxy VN co API doi IP chu dong) =====
-#   PROXY: endpoint proxy co dinh    "host:port"  hoac  "user:pass@host:port"
-#   PROXY_CHANGE_URL: link API doi IP cua nha cung cap (vd https://.../changeIP?key=XXX)
-#   De TRONG ca 2 -> dung Proton VPN tay.
+# ===== PROXY XOAY proxyxoay.shop (proxy.vn) =====
+#  Dan link API get.php (co key) vao PROXY_API_URL. Moi lan goi = doi IP + tra proxy MOI.
+#  Lay link o: proxy.vn -> API xoay. Vi du:
+#  PROXY_API_URL="https://proxyxoay.shop/api/get.php?key=KEY_CUA_BAN&nhamang=Random&tinhthanh=0"
+PROXY_API_URL=""
+PROXY_MIN_SEC=62        # goi proxy gioi han doi IP toi thieu 60s -> de 62s cho chac
+
+# (Tuy chon) proxy CO DINH neu khong dung API xoay: "host:port" hoac "user:pass@host:port"
 PROXY=""
-PROXY_CHANGE_URL=""        # link API doi IP (goi -> proxy doi sang IP moi)
-PROXY_CHANGE_MIN_SEC=62    # khong goi doi IP nhanh hon nay (goi proxy gioi han 60s)
+# Neu KHONG dien ca 2 -> dung Proton VPN tay.
 
 BATCH_PER_IP=6          # check bao nhieu serial thi DOI IP
 DELAY_MIN, DELAY_MAX=6, 14   # nghi ngau nhien giua moi serial (giay) - giong nguoi
 
-_last_ip_change=[0.0]
-def change_ip():
-    """Goi API doi IP cua proxy, ton trong gioi han 60s giua 2 lan."""
-    if not PROXY_CHANGE_URL: return False
-    wait=PROXY_CHANGE_MIN_SEC-(time.time()-_last_ip_change[0])
+_last_change=[0.0]
+def fetch_rotating_proxy():
+    """Goi API proxyxoay.shop -> tra 'host:port' proxy moi (da doi IP). None neu loi.
+       Ton trong gioi han doi IP toi thieu PROXY_MIN_SEC giay."""
+    if not PROXY_API_URL: return None
+    wait=PROXY_MIN_SEC-(time.time()-_last_change[0])
     if wait>0:
-        print(f"   (cho {int(wait)}s cho du gioi han doi IP {PROXY_CHANGE_MIN_SEC}s)...")
+        print(f"   (cho {int(wait)}s cho du gioi han doi IP {PROXY_MIN_SEC}s)...")
         time.sleep(wait+0.5)
     try:
         import requests
-        r=requests.get(PROXY_CHANGE_URL,timeout=30)
-        print("   >> doi IP:",(r.text or "")[:140].replace("\n"," "))
-        _last_ip_change[0]=time.time()
-        time.sleep(6)  # cho IP moi san sang
-        return True
+        j=requests.get(PROXY_API_URL,timeout=45).json()
+        if str(j.get("status"))!="100":
+            print("   !! API proxy bao loi:", j.get("message") or j); return None
+        raw=(j.get("proxyhttp") or "").strip()          # "host:port::"
+        m=re.match(r"([\w.\-]+):(\d+)", raw)
+        ph=f"{m.group(1)}:{m.group(2)}" if m else raw.replace(":","",0)
+        _last_change[0]=time.time()
+        print(f"   >> proxy moi: {ph}  ({j.get('Nha Mang','')}/{j.get('Vi Tri','')})  {j.get('message','')}")
+        time.sleep(4)   # cho proxy san sang
+        return ph
     except Exception as e:
-        print("   !! loi goi API doi IP:",e); return False
+        print("   !! loi goi API proxy:", e); return None
 UAS=[
  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
@@ -109,17 +118,17 @@ def _proxy_auth_ext(host,port,user,pwd,fn="proxy_auth_ext.zip"):
     z=zipfile.ZipFile(fn,"w"); z.writestr("manifest.json",manifest); z.writestr("bg.js",bg); z.close()
     return fn
 
-def create_browser():
+def create_browser(proxy=None):
     ua=random.choice(UAS)
     host=port=user=pwd=""
-    if PROXY: host,port,user,pwd=_parse_proxy(PROXY)
+    if proxy: host,port,user,pwd=_parse_proxy(proxy)
     Opt = uc.ChromeOptions() if HAS_UC else webdriver.ChromeOptions()
     Opt.add_argument("--start-maximized")
     Opt.add_argument("--user-agent="+ua)
     Opt.add_argument("--lang=vi-VN")
-    if PROXY and not user:                       # proxy KHONG auth (IP-whitelist)
+    if proxy and not user:                        # proxy KHONG auth (IP-whitelist)
         Opt.add_argument("--proxy-server=http://%s:%s"%(host,port))
-    if PROXY and user:                           # proxy CO user:pass -> extension
+    if proxy and user:                            # proxy CO user:pass -> extension
         try: Opt.add_extension(_proxy_auth_ext(host,port,user,pwd))
         except Exception as e: print("!! Loi extension proxy:",e)
     if HAS_UC:
@@ -332,9 +341,10 @@ def main():
     if not serials: print("Khong co serial nao trong serials.xlsx (bat dau o A2)"); return
     print("Da nap",len(serials),"serial")
     i,results=load_progress()
-    mode = ("PROXY+API doi IP" if PROXY_CHANGE_URL else "PROXY") if PROXY else "VPN tay"
+    mode = "PROXY XOAY (API)" if PROXY_API_URL else ("PROXY co dinh" if PROXY else "VPN tay")
     print(f">> Chong ban: IP={mode} | doi IP moi {BATCH_PER_IP} serial | nghi {DELAY_MIN}-{DELAY_MAX}s/serial | undetected={'BAT' if HAS_UC else 'TAT'}")
-    d=create_browser()
+    cur_proxy = fetch_rotating_proxy() if PROXY_API_URL else (PROXY or None)
+    d=create_browser(cur_proxy)
     done_on_ip=0
     while i<len(serials):
         try:
@@ -343,15 +353,15 @@ def main():
                 try: d.quit()
                 except: pass
                 print(f"\n>>> Da check {BATCH_PER_IP} serial tren IP nay.")
-                if PROXY_CHANGE_URL:
-                    change_ip()                 # goi API doi IP (tu dong, ton trong 60s)
+                if PROXY_API_URL:
+                    new=fetch_rotating_proxy()      # goi API -> doi IP + proxy moi
+                    if new: cur_proxy=new
                 elif PROXY:
-                    print(">>> (Proxy khong co API doi IP — mo lai browser)")
                     time.sleep(random.uniform(2,4))
                 else:
                     print(">>> DOI SERVER Proton VPN (de doi IP) -> roi an Enter de chay tiep...")
                     input()
-                d=create_browser(); done_on_ip=0
+                d=create_browser(cur_proxy); done_on_ip=0
                 time.sleep(random.uniform(3,6))
 
             r=handle(d,serials[i],i+1,len(serials))
