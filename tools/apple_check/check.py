@@ -19,8 +19,12 @@ except Exception:
 
 PROGRESS_FILE="progress.json"; RESULT_FILE="results.xlsx"; INPUT_FILE="serials.xlsx"
 
-# ===== CHONG BAN (free) =====
-BATCH_PER_IP=6          # check bao nhieu serial thi DOI IP (doi server VPN)
+# ===== CHONG BAN =====
+# PROXY XOAY: dien proxy vao day -> tu doi IP, KHONG can dung VPN tay.
+#   Dinh dang: "host:port"  hoac  "user:pass@host:port"  (http proxy)
+#   De TRONG "" -> dung Proton VPN (tool se nhac doi server moi BATCH_PER_IP serial)
+PROXY=""
+BATCH_PER_IP=6          # check bao nhieu serial thi DOI IP (chi khi dung VPN tay)
 DELAY_MIN, DELAY_MAX=6, 14   # nghi ngau nhien giua moi serial (giay) - giong nguoi
 UAS=[
  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -61,21 +65,48 @@ def load_progress():
         return d.get("index",0),rs
     return 0,[]
 
+def _parse_proxy(p):
+    """Tach 'user:pass@host:port' hoac 'host:port' -> (host,port,user,pass)."""
+    p=p.strip().replace("http://","").replace("https://","")
+    user=pwd=""
+    if "@" in p:
+        cred,hp=p.rsplit("@",1)
+        if ":" in cred: user,pwd=cred.split(":",1)
+    else: hp=p
+    host,port=hp.split(":",1) if ":" in hp else (hp,"80")
+    return host,port,user,pwd
+
+def _proxy_auth_ext(host,port,user,pwd,fn="proxy_auth_ext.zip"):
+    """Tao extension Chrome de proxy CO user:pass (Chrome khong nhan auth qua URL)."""
+    import zipfile
+    manifest='{"version":"1.0","manifest_version":2,"name":"px","permissions":["proxy","tabs","unlimitedStorage","storage","<all_urls>","webRequest","webRequestBlocking"],"background":{"scripts":["bg.js"]},"minimum_chrome_version":"22.0.0"}'
+    bg=('var c={mode:"fixed_servers",rules:{singleProxy:{scheme:"http",host:"%s",port:parseInt(%s)},bypassList:["localhost"]}};'
+        'chrome.proxy.settings.set({value:c,scope:"regular"},function(){});'
+        'chrome.webRequest.onAuthRequired.addListener(function(d){return{authCredentials:{username:"%s",password:"%s"}};},{urls:["<all_urls>"]},["blocking"]);'
+       )%(host,port,user,pwd)
+    z=zipfile.ZipFile(fn,"w"); z.writestr("manifest.json",manifest); z.writestr("bg.js",bg); z.close()
+    return fn
+
 def create_browser():
     ua=random.choice(UAS)
+    host=port=user=pwd=""
+    if PROXY: host,port,user,pwd=_parse_proxy(PROXY)
+    Opt = uc.ChromeOptions() if HAS_UC else webdriver.ChromeOptions()
+    Opt.add_argument("--start-maximized")
+    Opt.add_argument("--user-agent="+ua)
+    Opt.add_argument("--lang=vi-VN")
+    if PROXY and not user:                       # proxy KHONG auth (IP-whitelist)
+        Opt.add_argument("--proxy-server=http://%s:%s"%(host,port))
+    if PROXY and user:                           # proxy CO user:pass -> extension
+        try: Opt.add_extension(_proxy_auth_ext(host,port,user,pwd))
+        except Exception as e: print("!! Loi extension proxy:",e)
     if HAS_UC:
-        o=uc.ChromeOptions()
-        o.add_argument("--start-maximized")
-        o.add_argument("--user-agent="+ua)
-        o.add_argument("--lang=vi-VN")
-        d=uc.Chrome(options=o)
+        d=uc.Chrome(options=Opt)
     else:
-        o=webdriver.ChromeOptions()
-        o.add_argument("--start-maximized"); o.add_argument("--disable-blink-features=AutomationControlled")
-        o.add_argument("--user-agent="+ua)
-        o.add_experimental_option("excludeSwitches",["enable-automation"])
-        o.add_experimental_option("useAutomationExtension",False)
-        d=webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=o)
+        Opt.add_argument("--disable-blink-features=AutomationControlled")
+        Opt.add_experimental_option("excludeSwitches",["enable-automation"])
+        Opt.add_experimental_option("useAutomationExtension",False)
+        d=webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=Opt)
         try: d.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument",{"source":"Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"})
         except: pass
     return d
@@ -151,14 +182,32 @@ def find_captcha_img(driver):
         (By.XPATH,"//*[contains(@class,'captcha')]//img"),
         (By.CSS_SELECTOR,"img[src^='data:image']"),
     ])
-def find_captcha_input(driver):
-    return _find(driver,[
+def find_captcha_input(driver, serial_el=None):
+    """Tim DUNG o captcha: uu tien o ngay canh anh captcha, KHONG nham o serial."""
+    # 1) selector ten captcha
+    el=_find(driver,[
         (By.ID,"captcha-input"),
         (By.CSS_SELECTOR,"input[name*='captcha' i]"),
         (By.CSS_SELECTOR,"input[aria-label*='captcha' i]"),
         (By.XPATH,"//input[contains(@id,'captcha')]"),
-        (By.XPATH,"//input[@maxlength='4' or @maxlength='5' or @maxlength='6']"),
     ])
+    if el and el!=serial_el: return el
+    # 2) o text cung khung voi anh captcha
+    img=find_captcha_img(driver)
+    if img:
+        try:
+            box=img.find_element(By.XPATH,"./ancestor::*[self::div or self::form][1]")
+            for inp in box.find_elements(By.XPATH,".//input[@type='text' or not(@type)]"):
+                if inp.is_displayed() and inp!=serial_el: return inp
+        except: pass
+    # 3) o text dang hien, khac o serial, dang rong (captcha thuong la o cuoi)
+    cands=[]
+    for inp in driver.find_elements(By.XPATH,"//input[@type='text' or not(@type) or @type='tel']"):
+        try:
+            if inp.is_displayed() and inp!=serial_el and not (inp.get_attribute("value") or ""):
+                cands.append(inp)
+        except: pass
+    return cands[-1] if cands else None
 def find_continue(driver):
     return _find(driver,[
         (By.XPATH,"//button[contains(.,'Tiếp tục') or contains(.,'Continue') or contains(.,'Tiep tuc')]"),
@@ -166,33 +215,57 @@ def find_continue(driver):
         (By.CSS_SELECTOR,"button[type='submit']"),
     ])
 
+def human_type(el, text):
+    """Go tung ky tu cham nhu nguoi (kich hoat su kien React) - khong spam."""
+    try: el.click()
+    except: pass
+    try: el.clear()
+    except: pass
+    for ch in text:
+        try: el.send_keys(ch)
+        except: pass
+        time.sleep(random.uniform(0.08,0.22))
+    time.sleep(random.uniform(0.3,0.7))
+
+def submit_and_wait(driver, timeout=25):
+    """Bam Tiep tuc roi DOI ket qua that. Tra: 'done' (qua) / 'captcha_fail' / 'timeout'."""
+    btn=find_continue(driver)
+    if btn:
+        try: btn.click()
+        except Exception:
+            try: driver.execute_script("arguments[0].click()",btn)
+            except Exception: pass
+    end=time.time()+timeout
+    while time.time()<end:
+        # qua duoc = khong con anh captcha (da sang trang ket qua)
+        if find_captcha_img(driver) is None: return "done"
+        try: b=driver.find_element(By.TAG_NAME,"body").text.lower()
+        except: b=""
+        if any(k in b for k in ["không chính xác","khong chinh xac","thử lại","captcha không","sai mã","incorrect","try again"]):
+            return "captcha_fail"
+        time.sleep(1)
+    return "timeout"
+
 def solve_captcha_auto(driver,serial_el,serial):
-    """Tu giai captcha bang ddddocr, thu toi 4 lan. True=qua, False=khong giai duoc -> fallback tay."""
+    """Giai captcha tu dong (ddddocr) - go cham + submit + DOI ket qua. Thu toi 4 lan.
+       True=qua / False=OCR sai het / None=khong tim thay o -> nhap tay."""
     for attempt in range(4):
-        img=find_captcha_img(driver); cin=find_captcha_input(driver)
+        img=find_captcha_img(driver); cin=find_captcha_input(driver,serial_el)
         if not img or not cin:
-            return None  # khong tim thay element -> bao goi nhap tay
+            return None
         try: png=img.screenshot_as_png
         except Exception: return None
         text=re.sub(r'[^A-Za-z0-9]','',_ocr.classification(png) or '')
         if not text:
-            time.sleep(1); continue
+            time.sleep(1.2); continue
         print(f"   captcha OCR (lan {attempt+1}): {text}")
-        js_set(driver,cin,text)
-        btn=find_continue(driver)
-        if btn:
-            try: btn.click()
-            except Exception:
-                try: driver.execute_script("arguments[0].click()",btn)
-                except Exception: pass
-        time.sleep(3)
-        # Qua duoc khi: khong con o captcha nua (da sang trang ket qua)
-        if find_captcha_img(driver) is None:
-            return True
-        # Sai -> trang reload captcha moi; dien lai serial neu o serial xuat hien lai
+        human_type(cin,text)            # go cham vao DUNG o captcha
+        res=submit_and_wait(driver)     # gui + doi ket qua that
+        if res=="done": return True
+        # sai -> trang lam moi captcha; dien lai serial neu o serial hien lai
         s2=find_serial_input(driver,None)
-        if s2: js_set(driver,s2,serial)
-        time.sleep(1)
+        if s2 and (s2.get_attribute("value") or "")!=serial: js_set(driver,s2,serial)
+        time.sleep(random.uniform(1.0,2.0))
     return False
 
 def handle(driver,serial,i,total):
@@ -230,24 +303,32 @@ def main():
     if not serials: print("Khong co serial nao trong serials.xlsx (bat dau o A2)"); return
     print("Da nap",len(serials),"serial")
     i,results=load_progress()
-    print(f">> Chong ban: doi IP moi {BATCH_PER_IP} serial, nghi {DELAY_MIN}-{DELAY_MAX}s/serial, undetected={'BAT' if HAS_UC else 'TAT'}")
+    mode = "PROXY xoay" if PROXY else "VPN tay"
+    print(f">> Chong ban: IP={mode} | doi IP moi {BATCH_PER_IP} serial | nghi {DELAY_MIN}-{DELAY_MAX}s/serial | undetected={'BAT' if HAS_UC else 'TAT'}")
     d=create_browser()
     done_on_ip=0
     while i<len(serials):
         try:
-            # Doi IP sau moi lo: dong browser -> nhac doi server VPN -> browser moi (fingerprint moi)
+            # Doi IP sau moi lo
             if done_on_ip>=BATCH_PER_IP:
                 try: d.quit()
                 except: pass
-                print(f"\n>>> Da check {BATCH_PER_IP} serial tren IP nay.")
-                print(">>> DOI SERVER Proton VPN (de doi IP) -> roi an Enter de chay tiep...")
-                input()
+                if PROXY:
+                    # Proxy xoay -> mo browser moi = IP moi tu dong, KHONG can dung tay
+                    print(f"\n>>> Da check {BATCH_PER_IP} serial -> doi IP qua proxy (tu dong)...")
+                    time.sleep(random.uniform(2,4))
+                else:
+                    print(f"\n>>> Da check {BATCH_PER_IP} serial tren IP nay.")
+                    print(">>> DOI SERVER Proton VPN (de doi IP) -> roi an Enter de chay tiep...")
+                    input()
                 d=create_browser(); done_on_ip=0
                 time.sleep(random.uniform(3,6))
 
-            results.append(handle(d,serials[i],i+1,len(serials))); i+=1; done_on_ip+=1
+            r=handle(d,serials[i],i+1,len(serials))
+            results.append(r); i+=1; done_on_ip+=1
             save_progress(i,results)
-            if len(results)%5==0: save_results(results)
+            save_results(results)              # LUU NGAY sau moi serial hoan thanh
+            print(f"   -> da luu ket qua ({r.status})")
             if i<len(serials): human_pause(d)   # nghi ngau nhien giong nguoi
         except Exception as e:
             print("Loi vong lap:",e)
