@@ -49,8 +49,8 @@ def _build_proxy_url():
         return u
     return ""
 
-BATCH_PER_IP = 1          # 1 = MỖI SERIAL 1 IP MỚI (chống ban tối đa). Tăng 2-3 nếu muốn nhanh hơn
-DELAY_MIN, DELAY_MAX = 3, 6
+BATCH_PER_IP = 6          # 6 serial/IP. Chỉ gửi captcha khi CHẮC (ít sai) nên nhiều serial/IP vẫn an toàn. Bị ban lại thì giảm 3-4
+DELAY_MIN, DELAY_MAX = 2, 4
 
 CAPTCHA_TRIES = 5 # Số lần thử captcha/IP. Sai -> Apple tự nạp mã mới (xóa ô + đọc lại), KHÔNG refresh. Hết -> đổi IP
 
@@ -422,7 +422,7 @@ def reload_and_enter_serial(driver, serial):
     except:
         try: driver.execute_script("window.stop();")
         except: pass
-    time.sleep(4.0)
+    time.sleep(2.5)
     if looks_banned(driver): return None, None
     el = find_serial_input(driver, timeout=12)
     if not el: return None, None
@@ -478,23 +478,23 @@ def solve_captcha_loop(driver, serial):
 def handle(driver, serial, i, total):
     try:
         print(f"\n({i}/{total}) Serial: {serial}")
-        try: 
+        try:
             driver.get("https://checkcoverage.apple.com/?locale=vi_VN")
-            time.sleep(5.5) 
+            time.sleep(3.0)
         except:
             try: driver.execute_script("window.stop();")
             except: pass
-            
+
         if looks_banned(driver): return Result(serial, "BANNED", "", "", "")
-            
+
         el = find_serial_input(driver, timeout=15)
         if not el:
             if looks_banned(driver): return Result(serial, "BANNED", "", "", "")
             return Result(serial, "ERROR", "", "", "")
-            
+
         smooth_type(driver, el, serial)
-        time.sleep(3.0) 
-        
+        time.sleep(1.5)
+
         passed = solve_captcha_loop(driver, serial) if AUTO_CAPTCHA else None
         # Bat MOI ket qua loi cua captcha -> tra ve de main DOI IP + thu lai (khong ghi Unknown lung tung)
         if passed in ("TIMEOUT", "BANNED", "ERROR"): return Result(serial, passed, "", "", "")
@@ -502,7 +502,7 @@ def handle(driver, serial, i, total):
             print("   [!] Captcha chưa qua sau nhiều lần -> RETRY (đổi IP)")
             return Result(serial, "RETRY", "", "", "")
 
-        time.sleep(3.0) 
+        time.sleep(1.5)
         body = driver.find_element(By.TAG_NAME, "body").text.lower()
         
         if any(k in body for k in ["số sê-ri không hợp lệ", "invalid serial", "không thể tìm thấy"]):
@@ -525,7 +525,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v5.2 - OCR xu ly nhe + 2 model khop moi GUI; 1 IP 1 lan gui; sai -> doi IP")
+    print("Apple Checker v5.3 - Nhanh hon: 6 serial/IP + cat bot cho thua")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
@@ -543,8 +543,8 @@ def main():
     cur_proxy = fetch_rotating_proxy() if (PROXY_API_URL or PROXY_KEY) else (PROXY or None)
     
     if cur_proxy:
-        print("   [+] Chờ 12 giây cho cổng proxy khởi động mượt mà...")
-        time.sleep(12)
+        print("   [+] Chờ 7 giây cho cổng proxy khởi động...")
+        time.sleep(7)
         
     done_on_ip = 0
     try:
@@ -558,8 +558,8 @@ def main():
                 if (PROXY_API_URL or PROXY_KEY):
                     new = fetch_rotating_proxy()
                     if new: cur_proxy = new
-                print("   [+] Chờ 8 giây cho IP mới ổn định...")
-                time.sleep(8)
+                print("   [+] Chờ 5 giây cho IP mới ổn định...")
+                time.sleep(5)
                 done_on_ip = 0
 
             # ===== MỖI SERIAL = 1 TRÌNH DUYỆT MỚI (trang sạch 100%, không dính state serial trước) =====
@@ -584,7 +584,7 @@ def main():
                 if (PROXY_API_URL or PROXY_KEY):
                     new = fetch_rotating_proxy()
                     if new: cur_proxy = new
-                time.sleep(15)
+                time.sleep(8)
                 done_on_ip = 0
                 continue   # KHÔNG tăng idx -> thử lại serial này
 
