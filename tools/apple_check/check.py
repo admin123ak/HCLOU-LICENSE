@@ -52,7 +52,7 @@ def _build_proxy_url():
 BATCH_PER_IP = 1          # 1 = MỖI SERIAL 1 IP MỚI (chống ban tối đa). Tăng 2-3 nếu muốn nhanh hơn
 DELAY_MIN, DELAY_MAX = 3, 6
 
-CAPTCHA_TRIES = 3 # Số lần TẢI LẠI trang/IP để tìm captcha đọc CHẮC. Hết mà chưa chắc -> đổi IP. KHÔNG bao giờ gửi mã đoán mò
+CAPTCHA_TRIES = 5 # Số lần thử captcha/IP. Sai -> Apple tự nạp mã mới (xóa ô + đọc lại), KHÔNG refresh. Hết -> đổi IP
 
 def set_anti_sleep(status=True):
     try:
@@ -446,45 +446,53 @@ def reload_and_enter_serial(driver, serial):
     return wait_captcha_ready(driver)
 
 def solve_captcha_loop(driver, serial):
-    """CHIEN LUOC CHONG BAN: moi IP CHI gui 1 LAN khi CHAC CHAN.
-       - Chua chac -> TAI LAI trang (cung IP) lay captcha moi (KHONG refresh, KHONG gui).
-       - Gui sai -> tra False -> main DOI IP (khong thu lai tren IP da burn)."""
+    """Theo dung quan sat: GUI SAI -> Apple TU load captcha moi (khong can refresh).
+       Chi can: XOA o -> doc captcha moi (Apple tu nap) -> nhap lai. KHONG bam refresh."""
     img, sig = wait_captcha_ready(driver)
-
-    reads = 0
-    while reads < CAPTCHA_TRIES:
+    if img is None:
         if looks_banned(driver): return "BANNED"
-        if img is None:
-            print("   [!] Không load được captcha -> tải lại trang")
-            img, sig = reload_and_enter_serial(driver, serial); reads += 1; continue
+        print("   [!] Không load được captcha"); return "ERROR"
 
+    attempt = 0
+    while attempt < CAPTCHA_TRIES:
+        if looks_banned(driver): return "BANNED"
         cin = find_captcha_input(driver)
-        if not cin:
-            print("   [!] Không thấy ô captcha"); return "ERROR"
+        if not img or not cin:
+            print("   [!] Mất ô/ảnh captcha"); return "ERROR"
 
-        try:
-            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
-            time.sleep(0.4)
-        except: pass
+        if attempt == 0:
+            try:
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
+                time.sleep(0.4)
+            except: pass
 
-        text, conf = read_captcha_text(driver, img)   # 2 model x nhieu bien the
-        print(f"   captcha OCR (đọc {reads+1}/{CAPTCHA_TRIES}): {text} {'[chắc]' if conf else '[không chắc]'}")
+        text, conf = read_captcha_text(driver, img)   # 2 model x nhieu bien the -> dong thuan
+        print(f"   captcha OCR (lần {attempt+1}/{CAPTCHA_TRIES}): {text} {'[chắc]' if conf else '[không chắc]'}")
 
-        # CHUA CHAC / sai dinh dang -> TAI LAI trang lay captcha moi, TUYET DOI KHONG gui (tranh ban)
-        if not (4 <= len(text) <= 8) or not conf:
-            print("   [!] Chưa chắc -> tải lại trang lấy captcha mới (KHÔNG gửi, KHÔNG refresh)")
-            img, sig = reload_and_enter_serial(driver, serial)
-            reads += 1; continue
+        # Doc ra rac (sai dinh dang) -> doc lai chinh anh nay (chua gui)
+        if not (4 <= len(text) <= 8):
+            print("   [!] Đọc khó -> đọc lại"); time.sleep(1.2); attempt += 1; continue
 
-        # CHAC CHAN -> GUI DUY NHAT 1 LAN tren IP nay
+        # GUI ma
         type_captcha(driver, cin, text)
         print(f"   -> Gửi mã: {text}")
         status = submit_and_check(driver, cin, timeout=10)
         if status == "success": return True
         if status == "BANNED": return "BANNED"
-        # SAI -> KHONG refresh, KHONG gui lai tren IP nay -> doi IP
-        print("   [!] Mã sai -> ĐỔI IP (không thử lại trên IP đã dùng)")
-        return False
+
+        # SAI -> Apple TU load captcha MOI. Chi XOA o + DOI cho anh moi (KHONG refresh, KHONG reload).
+        print("   [!] Mã sai -> xóa ô, đọc captcha MỚI Apple tự nạp...")
+        attempt += 1
+        try:
+            cin.click(); cin.send_keys(Keys.CONTROL + "a"); cin.send_keys(Keys.BACKSPACE)
+        except: pass
+        new_img, new_sig = wait_captcha_ready(driver, old_sig=sig, timeout=10)
+        if new_img is None:
+            if looks_banned(driver): return "BANNED"
+            print("   [!] Captcha mới chưa nạp -> đổi IP"); return False
+        img, sig = new_img, new_sig   # ảnh mới Apple tự nạp -> đọc lại vòng sau
+
+    return False
 
     return False
 
@@ -538,7 +546,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v5.0 - Moi IP chi GUI 1 LAN khi CHAC; chua chac thi tai lai trang; KHONG refresh")
+    print("Apple Checker v5.1 - Sai thi Apple tu nap captcha moi (xoa o + doc lai, KHONG refresh)")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
