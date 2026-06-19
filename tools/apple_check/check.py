@@ -307,16 +307,25 @@ def captcha_sig(img):
     try: return str(len(img.screenshot_as_png))
     except: return ""
 
-def force_new_captcha(driver, old_img, timeout=6):
-    """Bam refresh + DOI cho anh THAT SU doi moi (khong dung anh cu). Tra img moi."""
+def force_new_captcha(driver, old_img, timeout=8):
+    """BAM nut refresh + DOI cho anh THAT SU doi moi. Tra img moi."""
     old = captcha_sig(old_img) if old_img else ""
-    find_refresh_captcha(driver)
+    btn = find_refresh_captcha(driver)
+    if btn:
+        # click THAT (fire mousedown) - nut Apple dung onMouse handler; JS click la du phong
+        try: btn.click()
+        except Exception:
+            try: driver.execute_script("arguments[0].click()", btn)
+            except: pass
+    else:
+        print("   [!] KHÔNG thấy nút làm mới captcha (captcha-refresh-btn)")
     end = time.time() + timeout
     while time.time() < end:
         img = find_captcha_img(driver)
         if img and captcha_sig(img) != old:
-            return img            # anh da doi moi
-        time.sleep(0.5)
+            return img            # anh da DOI moi -> ok
+        time.sleep(0.4)
+    print("   [!] Ảnh captcha chưa đổi sau khi bấm refresh")
     return find_captcha_img(driver)
 
 def looks_banned(driver):
