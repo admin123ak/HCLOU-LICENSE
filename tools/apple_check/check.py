@@ -382,21 +382,30 @@ def looks_banned(driver):
     except: return False
     return any(k in b for k in ["access denied", "forbidden", "reference #", "unusual activity", "too many requests"])
 
-def submit_and_check(driver, cin_element, timeout=8):
-    try: 
-        cin_element.send_keys(Keys.ENTER)
-        print("   [+] Đã gõ ENTER gửi mã...")
-    except: pass
-    
-    time.sleep(1.0)
-    
-    btn = find_continue(driver)
+def submit_and_check(driver, cin_element, timeout=10):
+    # Doi nut GUI (serial-button) bat enabled toi 5s
+    btn = None; end_btn = time.time() + 5
+    while time.time() < end_btn:
+        btn = find_continue(driver)
+        if btn:
+            try:
+                if btn.is_enabled() and not btn.get_attribute("disabled"): break
+            except: break
+        time.sleep(0.4)
+    clicked = False
     if btn:
-        try: driver.execute_script("arguments[0].click()", btn)
-        except:
-            try: btn.click()
+        try:
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn)
+            btn.click(); clicked = True; print("   [+] Đã bấm nút Gửi")
+        except Exception:
+            try: driver.execute_script("arguments[0].click()", btn); clicked = True; print("   [+] Đã bấm nút Gửi (JS)")
             except: pass
-            
+    if not clicked:
+        print("   [!] Không bấm được nút Gửi -> thử ENTER")
+    # Backup: nhan ENTER trong o captcha (form submit)
+    try: cin_element.send_keys(Keys.ENTER)
+    except: pass
+
     end_time = time.time() + timeout
     while time.time() < end_time:
         try: 
@@ -425,34 +434,32 @@ def _get_val(driver, el):
     except: return ""
 
 def type_captcha(driver, cin, text):
-    """Nhap ma vao o React (Apple). Dung NATIVE SETTER cua React (cach chuan) + verify."""
-    # 1) Cach CHUAN cho React controlled input: dung native value setter roi ban event 'input'
+    """Nhap ma vao o captcha. Uu tien GO THAT tung phim (React nhan tot nhat)."""
+    # 1) Go that tung phim (real keyboard event -> React cap nhat state chuan nhat)
+    try:
+        cin.click(); time.sleep(0.1)
+        cin.send_keys(Keys.CONTROL + "a"); cin.send_keys(Keys.BACKSPACE); time.sleep(0.15)
+        for ch in text:
+            cin.send_keys(ch); time.sleep(random.uniform(0.05, 0.12))
+        time.sleep(0.3)
+    except Exception as e:
+        print("   [!] go phim loi:", e)
+    if _get_val(driver, cin) == text: return True
+    # 2) Fallback: native setter React
     try:
         driver.execute_script("""
         var el=arguments[0], val=arguments[1];
         el.focus();
         var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
-        setter.call(el,'');
-        el.dispatchEvent(new Event('input',{bubbles:true}));
         setter.call(el,val);
         el.dispatchEvent(new Event('input',{bubbles:true}));
         el.dispatchEvent(new Event('change',{bubbles:true}));
         """, cin, text)
         time.sleep(0.3)
     except: pass
-    if _get_val(driver, cin) == text: return True
-    # 2) Fallback: go tay tung ky tu
-    try:
-        cin.click()
-        cin.send_keys(Keys.CONTROL + "a"); cin.send_keys(Keys.BACKSPACE)
-        time.sleep(0.2)
-        for ch in text:
-            cin.send_keys(ch); time.sleep(random.uniform(0.06, 0.13))
-        time.sleep(0.3)
-    except: pass
-    ok = _get_val(driver, cin) == text
-    if not ok: print(f"   [!] CHƯA gõ được mã vào ô (ô value='{_get_val(driver,cin)}')")
-    return ok
+    cur = _get_val(driver, cin)
+    if cur != text: print(f"   [debug] ô captcha đang có: '{cur}' (cần '{text}')")
+    return len(cur) >= 4   # ô có chữ (đủ dài) -> cho gửi
 
 APPLE_URL = "https://checkcoverage.apple.com/?locale=vi_VN"
 
@@ -566,7 +573,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v5.7 - Tu gom du lieu train (luu captcha giai dung vao captcha_dataset/)")
+    print("Apple Checker v5.8 - Go that tung phim + bam nut Gui chac chan (doi nut bat + click + ENTER) + log ro")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
