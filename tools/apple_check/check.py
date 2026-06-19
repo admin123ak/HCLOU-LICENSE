@@ -34,6 +34,12 @@ PROXY=""
 BATCH_PER_IP=6          # check bao nhieu serial thi DOI IP
 DELAY_MIN, DELAY_MAX=6, 14   # nghi ngau nhien giua moi serial (giay) - giong nguoi
 
+# ===== CHE DO TREO (chay khong can ngoi canh) =====
+# True = KHONG BAO GIO dung cho nhap tay. OCR sai -> thu lai/doi IP -> bo qua serial (RETRY).
+#        Bat buoc dung PROXY_API_URL (de tu doi IP, khong cho VPN tay).
+UNATTENDED=True
+CAPTCHA_TRIES=6         # so lan thu giai 1 captcha truoc khi bo qua
+
 _last_change=[0.0]
 def fetch_rotating_proxy():
     """Goi API proxyxoay.shop -> tra 'host:port' proxy moi (da doi IP). None neu loi.
@@ -256,6 +262,18 @@ def human_type(el, text):
         time.sleep(random.uniform(0.08,0.22))
     time.sleep(random.uniform(0.3,0.7))
 
+def refresh_captcha(driver):
+    """Bam nut lam moi captcha (lay anh moi de OCR de hon)."""
+    el=_find(driver,[
+        (By.CSS_SELECTOR,"[aria-label*='refresh' i],[aria-label*='lam moi' i],[aria-label*='làm mới' i]"),
+        (By.CSS_SELECTOR,".captcha-icon,.captcha-refresh,#captcha-refresh,[class*='refresh']"),
+        (By.XPATH,"//*[contains(@class,'captcha')]//button[not(@type='submit')]"),
+    ])
+    if el:
+        try: el.click(); time.sleep(1.5); return True
+        except: pass
+    return False
+
 def submit_and_wait(driver, timeout=25):
     """Bam Tiep tuc roi DOI ket qua that. Tra: 'done' (qua) / 'captcha_fail' / 'timeout'."""
     btn=find_continue(driver)
@@ -292,11 +310,10 @@ def solve_captcha_auto(driver,serial_el,serial):
     """Giai captcha tu dong (ddddocr) - go cham + submit + DOI ket qua. Thu toi 4 lan.
        True=qua / False=OCR sai het / None=khong tim thay o -> nhap tay."""
     wait_captcha_loaded(driver)   # cho captcha load xong
-    for attempt in range(4):
+    for attempt in range(CAPTCHA_TRIES):
         img=find_captcha_img(driver); cin=find_captcha_input(driver,serial_el)
         if not img or not cin:
             return None
-        # Tu cuon xuong cho anh + o captcha (giong nguoi, chac chan thay)
         try:
             driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
             time.sleep(random.uniform(0.5,1.0))
@@ -305,14 +322,15 @@ def solve_captcha_auto(driver,serial_el,serial):
         except Exception: return None
         text=re.sub(r'[^A-Za-z0-9]','',_ocr.classification(png) or '')
         if not text:
-            time.sleep(1.2); continue
-        print(f"   captcha OCR (lan {attempt+1}): {text}")
+            refresh_captcha(driver); time.sleep(1.2); continue
+        print(f"   captcha OCR (lan {attempt+1}/{CAPTCHA_TRIES}): {text}")
         try: driver.execute_script("arguments[0].scrollIntoView({block:'center'});", cin)
         except: pass
         human_type(cin,text)            # go cham vao DUNG o captcha
         res=submit_and_wait(driver)     # gui + doi ket qua that
         if res=="done": return True
-        # sai -> trang lam moi captcha; dien lai serial neu o serial hien lai
+        # sai -> lam moi captcha lay anh moi; dien lai serial neu o serial hien lai
+        refresh_captcha(driver)
         s2=find_serial_input(driver,timeout=3)
         if s2 and (s2.get_attribute("value") or "")!=serial: js_set(driver,s2,serial)
         time.sleep(random.uniform(1.0,2.0))
@@ -342,11 +360,15 @@ def handle(driver,serial,i,total):
                 print("   !! Co dau hieu BI BAN/CHAN"); return Result(serial,"BANNED","","","")
             print("Khong tim duoc o serial"); return Result(serial,"ERROR","","","")
         js_set(driver,el,serial)
-        # Tu giai captcha; neu khong duoc -> nhap tay (fallback)
+        # Tu giai captcha
         ok=solve_captcha_auto(driver,el,serial) if AUTO_CAPTCHA else None
         if ok is not True:
+            if UNATTENDED:
+                # CHE DO TREO: khong cho nhap tay -> bao RETRY de doi IP + thu lai sau
+                print("   (OCR chua qua -> RETRY, doi IP)")
+                return Result(serial,"RETRY","","","")
             if ok is None: print("   (Khong tu tim/giai duoc captcha — nhap tay)")
-            else: print("   (OCR sai 4 lan — nhap tay)")
+            else: print(f"   (OCR sai {CAPTCHA_TRIES} lan — nhap tay)")
             input(">> Nhap captcha & bam Tiep tuc, roi an Enter o day...")
         body=driver.find_element(By.TAG_NAME,"body").text.lower()
         if "ngày mua không hợp lệ" in body or "thiết bị chưa được kích hoạt" in body:
@@ -369,7 +391,10 @@ def main():
     print("Da nap",len(serials),"serial")
     i,results=load_progress()
     mode = "PROXY XOAY (API)" if PROXY_API_URL else ("PROXY co dinh" if PROXY else "VPN tay")
-    print(f">> Chong ban: IP={mode} | doi IP moi {BATCH_PER_IP} serial | nghi {DELAY_MIN}-{DELAY_MAX}s/serial | undetected={'BAT' if HAS_UC else 'TAT'}")
+    print(f">> Che do: TREO={'BAT' if UNATTENDED else 'TAT'} | IP={mode} | doi IP moi {BATCH_PER_IP} serial | undetected={'BAT' if HAS_UC else 'TAT'}")
+    if UNATTENDED and not PROXY_API_URL:
+        print("!! CANH BAO: Che do TREO can PROXY_API_URL (de tu doi IP). Chua co proxy -> se phai cho VPN tay, KHONG treo duoc.")
+    retry_count={}; MAX_RETRY=4
     cur_proxy = fetch_rotating_proxy() if PROXY_API_URL else (PROXY or None)
     d=create_browser(cur_proxy)
     done_on_ip=0
@@ -393,9 +418,16 @@ def main():
 
             r=handle(d,serials[i],i+1,len(serials))
 
-            # Bi BAN -> doi IP NGAY + thu lai chinh serial nay (khong tinh la da check)
-            if r.status=="BANNED":
-                print("   !! BI BAN -> doi IP ngay roi thu lai serial nay")
+            # BI BAN / RETRY (OCR chua qua) -> doi IP roi thu lai serial nay
+            if r.status in ("BANNED","RETRY"):
+                retry_count[serials[i]]=retry_count.get(serials[i],0)+1
+                if retry_count[serials[i]]>MAX_RETRY:
+                    # Thu qua nhieu lan van khong duoc -> bo qua, ghi UNKNOWN, di tiep
+                    print(f"   !! {serials[i]} thu {MAX_RETRY} lan khong duoc -> bo qua (UNKNOWN)")
+                    r=Result(serials[i],"Unknown","","",""); results.append(r); i+=1; done_on_ip+=1
+                    save_progress(i,results); save_results(results)
+                    continue
+                print(f"   !! {r.status} -> doi IP roi thu lai (lan {retry_count[serials[i]]}/{MAX_RETRY})")
                 try: d.quit()
                 except: pass
                 if PROXY_API_URL:
@@ -404,7 +436,8 @@ def main():
                 elif PROXY:
                     time.sleep(random.uniform(2,4))
                 else:
-                    print(">>> BI BAN! DOI SERVER Proton VPN -> roi an Enter...")
+                    # Khong co proxy -> treo khong tu doi IP duoc; cho VPN tay (neu UNATTENDED se ket)
+                    print(">>> DOI SERVER Proton VPN -> roi an Enter...")
                     input()
                 d=create_browser(cur_proxy); done_on_ip=0
                 time.sleep(random.uniform(3,6))
@@ -420,7 +453,7 @@ def main():
             try: d.quit()
             except: pass
             time.sleep(random.uniform(3,6))
-            d=create_browser(); done_on_ip=0
+            d=create_browser(cur_proxy); done_on_ip=0
     try: d.quit()
     except: pass
     save_results(results)
