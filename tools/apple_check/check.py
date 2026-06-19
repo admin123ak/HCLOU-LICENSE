@@ -49,8 +49,8 @@ def _build_proxy_url():
         return u
     return ""
 
-BATCH_PER_IP = 3          # Ít serial/IP -> đổi IP thường xuyên -> ÍT BAN hơn
-DELAY_MIN, DELAY_MAX = 5, 9
+BATCH_PER_IP = 1          # 1 = MỖI SERIAL 1 IP MỚI (chống ban tối đa). Tăng 2-3 nếu muốn nhanh hơn
+DELAY_MIN, DELAY_MAX = 3, 6
 
 CAPTCHA_TRIES = 5 # Mỗi lần sai = 1 request. Ít lần -> ít request -> ít ban. Sai 5 lần thì RETRY đổi IP
 
@@ -512,7 +512,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v4.4 - Moi serial 1 trinh duyet moi (trang sach)")
+    print("Apple Checker v4.6 - Moi serial = browser moi + IP moi (chong ban toi da)")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
@@ -545,8 +545,8 @@ def main():
                 if (PROXY_API_URL or PROXY_KEY):
                     new = fetch_rotating_proxy()
                     if new: cur_proxy = new
-                print("   [+] Chờ 15 giây cho IP mới ổn định...")
-                time.sleep(15)
+                print("   [+] Chờ 8 giây cho IP mới ổn định...")
+                time.sleep(8)
                 done_on_ip = 0
 
             # ===== MỖI SERIAL = 1 TRÌNH DUYỆT MỚI (trang sạch 100%, không dính state serial trước) =====
