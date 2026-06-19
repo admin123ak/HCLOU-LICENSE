@@ -275,30 +275,9 @@ def find_refresh_captcha(driver):
 def _ocr_clean(txt):
     return re.sub(r'[^A-Za-z0-9]', '', (txt or '')).upper()
 
-def _img_variants(data):
-    """Tao nhieu phien ban anh da xu ly de OCR chinh xac hon."""
-    out = [data]   # anh goc
-    try:
-        from PIL import Image, ImageOps, ImageFilter
-        import io
-        base = Image.open(io.BytesIO(data)).convert("L")        # grayscale
-        w, h = base.size
-        if w < 450:
-            base = base.resize((w*3, h*3), Image.LANCZOS)       # phong to
-        variants = [
-            ImageOps.autocontrast(base),                        # tang tuong phan
-            base.filter(ImageFilter.SHARPEN),                   # lam net
-            base.point(lambda x: 0 if x < 128 else 255).convert("L"),  # nhi phan hoa
-            ImageOps.autocontrast(base.filter(ImageFilter.MedianFilter(3))),  # kho nhieu
-        ]
-        for im in variants:
-            buf = io.BytesIO(); im.save(buf, format="PNG"); out.append(buf.getvalue())
-    except: pass
-    return out
-
 def read_captcha_text(driver, img):
-    """OCR bang 2 model x nhieu bien the anh -> lay ket qua DONG THUAN (nhieu phieu nhat).
-       Tra (text, confident): confident=True khi >=2 lan OCR cho cung 1 ket qua."""
+    """OCR: anh goc base64 + grayscale + phong to + autocontrast (xu ly NHE, khong pha anh).
+       2 model doi chieu. Tra (text, strong): strong=True khi 2 model cho CUNG ket qua."""
     data = None
     try:
         src = img.get_attribute("src") or ""
@@ -309,18 +288,24 @@ def read_captcha_text(driver, img):
     if not data:
         try: data = img.screenshot_as_png
         except: return "", False
-    from collections import Counter
-    votes = Counter()
-    for variant in _img_variants(data):
-        for eng in (_ocr, _ocr2):
-            if not eng: continue
-            try:
-                t = _ocr_clean(eng.classification(variant))
-                if 4 <= len(t) <= 8: votes[t] += 1
-            except: pass
-    if not votes: return "", False
-    top, cnt = votes.most_common(1)[0]
-    return top, (cnt >= 2)   # >=2 lan trung = tin cay cao
+    # Tien xu ly NHE (khong nhi phan/khu nhieu manh -> tranh pha net chu)
+    proc = data
+    try:
+        from PIL import Image, ImageOps
+        import io
+        im = Image.open(io.BytesIO(data)).convert("L")
+        w, h = im.size
+        if w < 450: im = im.resize((w*3, h*3), Image.LANCZOS)
+        im = ImageOps.autocontrast(im)
+        buf = io.BytesIO(); im.save(buf, format="PNG"); proc = buf.getvalue()
+    except: pass
+    t1 = _ocr_clean(_ocr.classification(proc)) if _ocr else ""
+    t2 = _ocr_clean(_ocr2.classification(proc)) if _ocr2 else ""
+    # STRONG = 2 model cho cung ket qua + dung do dai (rat it khi 2 model cung sai giong nhau)
+    if t1 and t1 == t2 and 4 <= len(t1) <= 8:
+        return t1, True
+    cand = t1 if 4 <= len(t1) <= 8 else t2
+    return cand, False
 
 def captcha_sig(img):
     """Chu ky anh captcha -> de biet anh CO DOI hay khong (tranh doc lai anh cu)."""
@@ -446,51 +431,45 @@ def reload_and_enter_serial(driver, serial):
     return wait_captcha_ready(driver)
 
 def solve_captcha_loop(driver, serial):
-    """Theo dung quan sat: GUI SAI -> Apple TU load captcha moi (khong can refresh).
-       Chi can: XOA o -> doc captcha moi (Apple tu nap) -> nhap lai. KHONG bam refresh."""
+    """SU THAT: Apple BAN ngay khi gui DU 1 captcha SAI -> moi IP CHI duoc gui 1 lan.
+       => Chua CUC chac -> TAI LAI trang (cung IP, KHONG gui) lay mã khác dễ đọc hơn.
+          Chỉ GỬI khi nhiều model + biến thể ĐỒNG THUẬN mạnh. Gửi sai -> ĐỔI IP ngay."""
     img, sig = wait_captcha_ready(driver)
     if img is None:
         if looks_banned(driver): return "BANNED"
         print("   [!] Không load được captcha"); return "ERROR"
 
-    attempt = 0
-    while attempt < CAPTCHA_TRIES:
+    reads = 0
+    while reads < CAPTCHA_TRIES:
         if looks_banned(driver): return "BANNED"
+        if img is None:
+            img, sig = reload_and_enter_serial(driver, serial); reads += 1; continue
         cin = find_captcha_input(driver)
-        if not img or not cin:
-            print("   [!] Mất ô/ảnh captcha"); return "ERROR"
+        if not cin: print("   [!] Không thấy ô captcha"); return "ERROR"
 
-        if attempt == 0:
+        if reads == 0:
             try:
                 driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
                 time.sleep(0.4)
             except: pass
 
-        text, conf = read_captcha_text(driver, img)   # 2 model x nhieu bien the -> dong thuan
-        print(f"   captcha OCR (lần {attempt+1}/{CAPTCHA_TRIES}): {text} {'[chắc]' if conf else '[không chắc]'}")
+        text, strong = read_captcha_text(driver, img)   # strong = nhiều model/biến thể khớp
+        print(f"   captcha OCR (đọc {reads+1}/{CAPTCHA_TRIES}): {text} {'[CHẮC]' if strong else '[chưa chắc]'}")
 
-        # Doc ra rac (sai dinh dang) -> doc lai chinh anh nay (chua gui)
-        if not (4 <= len(text) <= 8):
-            print("   [!] Đọc khó -> đọc lại"); time.sleep(1.2); attempt += 1; continue
+        # CHUA CUC CHAC -> KHONG gui (1 sai = ban). Tai lai trang lay ma khac (cung IP, an toan).
+        if not (4 <= len(text) <= 8) or not strong:
+            print("   [!] Chưa đủ chắc -> tải lại trang lấy mã khác (KHÔNG gửi)")
+            img, sig = reload_and_enter_serial(driver, serial)
+            reads += 1; continue
 
-        # GUI ma
+        # CUC CHAC -> GUI DUY NHAT 1 LAN tren IP nay
         type_captcha(driver, cin, text)
         print(f"   -> Gửi mã: {text}")
         status = submit_and_check(driver, cin, timeout=10)
         if status == "success": return True
         if status == "BANNED": return "BANNED"
-
-        # SAI -> Apple TU load captcha MOI. Chi XOA o + DOI cho anh moi (KHONG refresh, KHONG reload).
-        print("   [!] Mã sai -> xóa ô, đọc captcha MỚI Apple tự nạp...")
-        attempt += 1
-        try:
-            cin.click(); cin.send_keys(Keys.CONTROL + "a"); cin.send_keys(Keys.BACKSPACE)
-        except: pass
-        new_img, new_sig = wait_captcha_ready(driver, old_sig=sig, timeout=10)
-        if new_img is None:
-            if looks_banned(driver): return "BANNED"
-            print("   [!] Captcha mới chưa nạp -> đổi IP"); return False
-        img, sig = new_img, new_sig   # ảnh mới Apple tự nạp -> đọc lại vòng sau
+        print("   [!] Mã sai -> ĐỔI IP (IP này coi như đã cháy)")
+        return False
 
     return False
 
@@ -546,7 +525,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v5.1 - Sai thi Apple tu nap captcha moi (xoa o + doc lai, KHONG refresh)")
+    print("Apple Checker v5.2 - OCR xu ly nhe + 2 model khop moi GUI; 1 IP 1 lan gui; sai -> doi IP")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
