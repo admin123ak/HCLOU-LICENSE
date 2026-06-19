@@ -307,26 +307,45 @@ def captcha_sig(img):
     try: return str(len(img.screenshot_as_png))
     except: return ""
 
-def force_new_captcha(driver, old_img, timeout=8):
-    """BAM nut refresh + DOI cho anh THAT SU doi moi. Tra img moi."""
-    old = captcha_sig(old_img) if old_img else ""
+def _captcha_loaded(img):
+    """True neu anh captcha da LOAD XONG (base64 that, khong phai 'Loading')."""
+    try:
+        src = img.get_attribute("src") or ""
+    except: return False
+    if src.startswith("data:image"):
+        return len(src) > 300        # data uri du dai = anh that
+    # khong co src data -> dua vao kich thuoc
+    try: return img.size.get('width', 0) > 20
+    except: return False
+
+def wait_captcha_ready(driver, old_sig=None, timeout=14):
+    """ĐỢI captcha LOAD XONG (va KHAC anh cu neu old_sig). Tra (img, sig)."""
+    end = time.time() + timeout
+    while time.time() < end:
+        if looks_banned(driver): return None, ""
+        img = find_captcha_img(driver)
+        if img and _captcha_loaded(img):
+            sig = captcha_sig(img)
+            if old_sig is None or sig != old_sig:
+                return img, sig      # da load xong + la anh moi
+        time.sleep(0.5)
+    img = find_captcha_img(driver)
+    return img, (captcha_sig(img) if img else "")
+
+def refresh_and_wait(driver, old_sig, timeout=14):
+    """BAM nut refresh roi ĐỢI anh moi LOAD XONG. Tra (img, sig)."""
     btn = find_refresh_captcha(driver)
     if btn:
-        # click THAT (fire mousedown) - nut Apple dung onMouse handler; JS click la du phong
         try: btn.click()
         except Exception:
             try: driver.execute_script("arguments[0].click()", btn)
             except: pass
     else:
-        print("   [!] KHÔNG thấy nút làm mới captcha (captcha-refresh-btn)")
-    end = time.time() + timeout
-    while time.time() < end:
-        img = find_captcha_img(driver)
-        if img and captcha_sig(img) != old:
-            return img            # anh da DOI moi -> ok
-        time.sleep(0.4)
-    print("   [!] Ảnh captcha chưa đổi sau khi bấm refresh")
-    return find_captcha_img(driver)
+        print("   [!] KHÔNG thấy nút làm mới captcha")
+    img, sig = wait_captcha_ready(driver, old_sig=old_sig, timeout=timeout)
+    if sig == old_sig:
+        print("   [!] Ảnh captcha chưa đổi sau khi refresh")
+    return img, sig
 
 def looks_banned(driver):
     try: b = driver.find_element(By.TAG_NAME, "body").text.lower()
@@ -387,71 +406,59 @@ def type_captcha(driver, cin, text):
         except: pass
 
 def solve_captcha_loop(driver, serial):
-    attempt = 0
-    blank_counter = 0
     scrolled = False
     tried = set()       # cac ma DA gui -> khong gui trung
     dup_count = 0       # so lan OCR ra ma trung (anh khong doi)
 
+    # ĐỢI captcha load xong NGAY TU DAU (khong OCR anh dang "Loading")
+    img, sig = wait_captcha_ready(driver)
+    if img is None:
+        if looks_banned(driver): return "BANNED"
+        print("   [!] Không thấy/không load được captcha"); return "ERROR"
+
+    attempt = 0
     while attempt < CAPTCHA_TRIES:
         if looks_banned(driver): return "BANNED"
 
-        img = find_captcha_img(driver)
         cin = find_captcha_input(driver)
-
         if not img or not cin:
-            if looks_banned(driver): return "BANNED"
-            blank_counter += 1
-            if blank_counter > 5:
-                print("   [!] Web kẹt. Thoát phiên...")
-                return "ERROR"
-            time.sleep(3.0); continue
-
-        blank_counter = 0
+            print("   [!] Mất ô captcha/ảnh -> thoát"); return "ERROR"
 
         # Cuon toi captcha CHI 1 LAN (het giat giat)
         if not scrolled:
             try:
                 driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
-                scrolled = True; time.sleep(0.8)
+                scrolled = True; time.sleep(0.5)
             except: pass
 
-        text = read_captcha_text(driver, img)   # doc anh net + phong to + grayscale
+        text = read_captcha_text(driver, img)   # doc anh ĐÃ LOAD XONG + phong to + grayscale
         print(f"   captcha OCR (lần {attempt+1}/{CAPTCHA_TRIES}): {text}")
 
-        # Sai dinh dang -> DOI ANH MOI (cho doi that) roi doc lai
-        if not (4 <= len(text) <= 8):
-            print(f"   [!] OCR khó đọc ({text}) -> đổi ảnh mới")
-            img = force_new_captcha(driver, img)
-            attempt += 1; time.sleep(0.8); continue
+        # Sai dinh dang HOAC trung ma cu -> DOI ANH MOI (cho LOAD XONG) roi doc lai, KHONG gui
+        if not (4 <= len(text) <= 8) or text in tried:
+            ly_do = "khó đọc" if not (4 <= len(text) <= 8) else "trùng mã cũ"
+            print(f"   [!] {text} ({ly_do}) -> đổi ảnh mới (KHÔNG gửi)")
+            dup_count = dup_count + 1 if text in tried else 0
+            if dup_count >= 3:
+                print("   [!] Ảnh captcha không đổi -> RETRY đổi IP"); return False
+            img, sig = refresh_and_wait(driver, sig)
+            attempt += 1; continue
 
-        # Ma TRUNG ma da thu -> KHONG gui lai (tranh spam cung 1 ma), doi anh moi
-        if text in tried:
-            dup_count += 1
-            print(f"   [!] Mã '{text}' đã thử rồi -> đổi ảnh mới (không gửi trùng)")
-            img = force_new_captcha(driver, img)
-            if dup_count >= 3:   # refresh hoai van trung -> thoat de doi IP/browser
-                print("   [!] Ảnh captcha không đổi -> RETRY đổi IP")
-                return False
-            time.sleep(0.6); continue   # KHONG tang attempt (chua gui)
-        dup_count = 0
+        # GO ma + KIEM TRA da vao o chua + gui
         tried.add(text)
-
-        # GO ma vao o (co kiem tra + ep JS neu chua vao)
         type_captcha(driver, cin, text)
         print(f"   -> Gửi mã: {text}")
-
         status = submit_and_check(driver, cin, timeout=8)
         if status == "success": return True
         if status == "BANNED": return "BANNED"
 
-        # SAI -> DOI ANH MOI (doi cho anh doi that) roi thu lai
-        print("   [!] Mã sai -> đổi ảnh mới, thử lại...")
+        # SAI -> bam refresh + ĐỢI anh moi LOAD XONG roi thu lai (khong spam anh chua load)
+        print("   [!] Mã sai -> đổi ảnh mới, đợi load xong...")
         attempt += 1
         try:
             cin.click(); cin.send_keys(Keys.CONTROL + "a"); cin.send_keys(Keys.BACKSPACE)
         except: pass
-        img = force_new_captcha(driver, img)
+        img, sig = refresh_and_wait(driver, sig)
 
         s_box = find_serial_input(driver, timeout=2)
         if s_box:
@@ -512,7 +519,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v4.6 - Moi serial = browser moi + IP moi (chong ban toi da)")
+    print("Apple Checker v4.7 - Doi captcha LOAD XONG moi OCR (het spam anh chua load)")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
