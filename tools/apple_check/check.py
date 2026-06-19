@@ -49,10 +49,10 @@ def _build_proxy_url():
         return u
     return ""
 
-BATCH_PER_IP = 6          # 6 serial/IP. Chỉ gửi captcha khi CHẮC (ít sai) nên nhiều serial/IP vẫn an toàn. Bị ban lại thì giảm 3-4
+BATCH_PER_IP = 1          # 1 IP / 1 serial (chống ban). KHÔNG load lại trang, chỉ load mã captcha mới khi chưa chắc
 DELAY_MIN, DELAY_MAX = 2, 4
 
-CAPTCHA_TRIES = 5 # Số lần thử captcha/IP. Sai -> Apple tự nạp mã mới (xóa ô + đọc lại), KHÔNG refresh. Hết -> đổi IP
+CAPTCHA_TRIES = 5 # Số lần LOAD MÃ captcha (refresh) để tìm mã đọc CHẮC. Hết mà chưa chắc -> đổi IP. KHÔNG load lại trang
 
 def set_anti_sleep(status=True):
     try:
@@ -300,7 +300,10 @@ def read_captcha_text(driver, img):
         buf = io.BytesIO(); im.save(buf, format="PNG"); proc = buf.getvalue()
     except: pass
     t1 = _ocr_clean(_ocr.classification(proc)) if _ocr else ""
-    t2 = _ocr_clean(_ocr2.classification(proc)) if _ocr2 else ""
+    # CHI co 1 model -> tin neu dung dinh dang (khong cross-check duoc, tranh ket vong lap)
+    if _ocr2 is None:
+        return t1, (4 <= len(t1) <= 8)
+    t2 = _ocr_clean(_ocr2.classification(proc))
     # STRONG = 2 model cho cung ket qua + dung do dai (rat it khi 2 model cung sai giong nhau)
     if t1 and t1 == t2 and 4 <= len(t1) <= 8:
         return t1, True
@@ -327,7 +330,7 @@ def _captcha_loaded(img):
     try: return img.size.get('width', 0) > 20
     except: return False
 
-def wait_captcha_ready(driver, old_sig=None, timeout=14):
+def wait_captcha_ready(driver, old_sig=None, timeout=8):
     """ĐỢI captcha LOAD XONG (va KHAC anh cu neu old_sig). Tra (img, sig)."""
     end = time.time() + timeout
     while time.time() < end:
@@ -341,7 +344,7 @@ def wait_captcha_ready(driver, old_sig=None, timeout=14):
     img = find_captcha_img(driver)
     return img, (captcha_sig(img) if img else "")
 
-def refresh_and_wait(driver, old_sig, timeout=14):
+def refresh_and_wait(driver, old_sig, timeout=8):
     """BAM nut refresh roi ĐỢI anh moi LOAD XONG. Tra (img, sig)."""
     btn = find_refresh_captcha(driver)
     if btn:
@@ -432,37 +435,37 @@ def reload_and_enter_serial(driver, serial):
 
 def solve_captcha_loop(driver, serial):
     """SU THAT: Apple BAN ngay khi gui DU 1 captcha SAI -> moi IP CHI duoc gui 1 lan.
-       => Chua CUC chac -> TAI LAI trang (cung IP, KHONG gui) lay mã khác dễ đọc hơn.
+       => Chua chac -> LOAD MA captcha moi (bam refresh, KHONG load lai trang, KHONG gui).
           Chỉ GỬI khi nhiều model + biến thể ĐỒNG THUẬN mạnh. Gửi sai -> ĐỔI IP ngay."""
     img, sig = wait_captcha_ready(driver)
     if img is None:
         if looks_banned(driver): return "BANNED"
         print("   [!] Không load được captcha"); return "ERROR"
 
+    cin = find_captcha_input(driver)
+    if cin:
+        try:
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
+            time.sleep(0.3)
+        except: pass
+
     reads = 0
     while reads < CAPTCHA_TRIES:
         if looks_banned(driver): return "BANNED"
-        if img is None:
-            img, sig = reload_and_enter_serial(driver, serial); reads += 1; continue
         cin = find_captcha_input(driver)
-        if not cin: print("   [!] Không thấy ô captcha"); return "ERROR"
+        if img is None or not cin:
+            print("   [!] Mất ô/ảnh captcha -> đổi IP"); return False
 
-        if reads == 0:
-            try:
-                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
-                time.sleep(0.4)
-            except: pass
-
-        text, strong = read_captcha_text(driver, img)   # strong = nhiều model/biến thể khớp
+        text, strong = read_captcha_text(driver, img)   # strong = 2 model khớp
         print(f"   captcha OCR (đọc {reads+1}/{CAPTCHA_TRIES}): {text} {'[CHẮC]' if strong else '[chưa chắc]'}")
 
-        # CHUA CUC CHAC -> KHONG gui (1 sai = ban). Tai lai trang lay ma khac (cung IP, an toan).
+        # CHUA CHAC -> chỉ LOAD MÃ MỚI (bấm refresh captcha), KHÔNG load lại trang, KHÔNG gửi
         if not (4 <= len(text) <= 8) or not strong:
-            print("   [!] Chưa đủ chắc -> tải lại trang lấy mã khác (KHÔNG gửi)")
-            img, sig = reload_and_enter_serial(driver, serial)
+            print("   [!] Chưa chắc -> load mã captcha mới (refresh, KHÔNG load lại trang)")
+            img, sig = refresh_and_wait(driver, sig)
             reads += 1; continue
 
-        # CUC CHAC -> GUI DUY NHAT 1 LAN tren IP nay
+        # CHAC -> GUI DUY NHAT 1 LAN tren IP nay
         type_captcha(driver, cin, text)
         print(f"   -> Gửi mã: {text}")
         status = submit_and_check(driver, cin, timeout=10)
@@ -470,8 +473,6 @@ def solve_captcha_loop(driver, serial):
         if status == "BANNED": return "BANNED"
         print("   [!] Mã sai -> ĐỔI IP (IP này coi như đã cháy)")
         return False
-
-    return False
 
     return False
 
@@ -525,7 +526,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v5.3 - Nhanh hon: 6 serial/IP + cat bot cho thua")
+    print("Apple Checker v5.4 - 1 IP/serial; chua chac thi LOAD MA captcha moi (refresh), KHONG load lai trang")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
@@ -580,7 +581,7 @@ def main():
                     save_results(master_serials, existing_results)
                     print(f"   [!] {s} thử {MAX_RETRY} lần không được -> bỏ qua ({r.status})")
                     continue
-                print(f"   [!] Lỗi ({r.status}) -> đổi IP, thử lại sau 15s...")
+                print(f"   [!] Lỗi ({r.status}) -> đổi IP, thử lại sau 8s...")
                 if (PROXY_API_URL or PROXY_KEY):
                     new = fetch_rotating_proxy()
                     if new: cur_proxy = new
