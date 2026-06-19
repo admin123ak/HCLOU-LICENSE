@@ -275,19 +275,37 @@ def find_refresh_captcha(driver):
 def _ocr_clean(txt):
     return re.sub(r'[^A-Za-z0-9]', '', (txt or '')).upper()
 
-def read_captcha_text(driver, img):
-    """OCR: anh goc base64 + grayscale + phong to + autocontrast (xu ly NHE, khong pha anh).
-       2 model doi chieu. Tra (text, strong): strong=True khi 2 model cho CUNG ket qua."""
-    data = None
+# ===== TU GOM DU LIEU TRAIN (free): moi captcha giai DUNG -> luu anh + ma dung =====
+COLLECT_DATASET = True              # True = tu luu mau captcha giai dung de train model rieng sau
+DATASET_DIR = "captcha_dataset"
+
+def get_captcha_bytes(img):
+    """Lay bytes anh captcha (uu tien base64 goc)."""
     try:
         src = img.get_attribute("src") or ""
         if src.startswith("data:image"):
             import base64
-            data = base64.b64decode(src.split(",", 1)[1])
+            return base64.b64decode(src.split(",", 1)[1])
     except: pass
+    try: return img.screenshot_as_png
+    except: return None
+
+def save_captcha_sample(data, text):
+    """Luu 1 mau captcha DA GIAI DUNG: file ten = <ma>_<ngaunhien>.png (chuan train ddddocr)."""
+    if not (COLLECT_DATASET and data and text and 4 <= len(text) <= 8): return
+    try:
+        os.makedirs(DATASET_DIR, exist_ok=True)
+        rid = "".join(random.choice("0123456789abcdef") for _ in range(6))
+        with open(os.path.join(DATASET_DIR, f"{text}_{rid}.png"), "wb") as f:
+            f.write(data)
+    except: pass
+
+def read_captcha_text(driver, img):
+    """OCR: anh goc base64 + grayscale + phong to + autocontrast (xu ly NHE, khong pha anh).
+       2 model doi chieu. Tra (text, strong): strong=True khi 2 model cho CUNG ket qua."""
+    data = get_captcha_bytes(img)
     if not data:
-        try: data = img.screenshot_as_png
-        except: return "", False
+        return "", False
     # Tien xu ly NHE (khong nhi phan/khu nhieu manh -> tranh pha net chu)
     proc = data
     try:
@@ -482,13 +500,18 @@ def solve_captcha_loop(driver, serial):
         if not (4 <= len(text) <= 8):
             print("   [!] Vẫn khó đọc -> đổi IP"); return False
 
+    # Luu bytes anh captcha TRUOC khi gui (de luu mau train neu giai dung)
+    cap_bytes = get_captcha_bytes(img)
+
     # GUI 1 LAN tren IP nay (du strong hay khong - vi refresh nhieu cung bi ban).
     if not type_captcha(driver, cin, text):
         print("   [!] Không gõ được mã vào ô -> đổi IP (KHÔNG gửi rỗng = tránh ban)")
         return False
     print(f"   -> Gửi mã: {text}")
     status = submit_and_check(driver, cin, timeout=10)
-    if status == "success": return True
+    if status == "success":
+        save_captcha_sample(cap_bytes, text)   # GIAI DUNG -> luu mau (anh + ma dung) de train sau
+        return True
     if status == "BANNED": return "BANNED"
     print("   [!] Mã sai -> ĐỔI IP (IP này coi như đã cháy)")
     return False
@@ -543,7 +566,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v5.6 - Nhap captcha bang React native setter (fix khong go duoc); khong go duoc thi KHONG gui rong")
+    print("Apple Checker v5.7 - Tu gom du lieu train (luu captcha giai dung vao captcha_dataset/)")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
