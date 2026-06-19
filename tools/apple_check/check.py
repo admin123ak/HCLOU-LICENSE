@@ -52,7 +52,7 @@ def _build_proxy_url():
 BATCH_PER_IP = 1          # 1 = MỖI SERIAL 1 IP MỚI (chống ban tối đa). Tăng 2-3 nếu muốn nhanh hơn
 DELAY_MIN, DELAY_MAX = 3, 6
 
-CAPTCHA_TRIES = 5 # Mỗi lần sai = 1 request. Ít lần -> ít request -> ít ban. Sai 5 lần thì RETRY đổi IP
+CAPTCHA_TRIES = 3 # Số lần TẢI LẠI trang/IP để tìm captcha đọc CHẮC. Hết mà chưa chắc -> đổi IP. KHÔNG bao giờ gửi mã đoán mò
 
 def set_anti_sleep(status=True):
     try:
@@ -429,73 +429,62 @@ def type_captcha(driver, cin, text):
             time.sleep(0.3)
         except: pass
 
+APPLE_URL = "https://checkcoverage.apple.com/?locale=vi_VN"
+
+def reload_and_enter_serial(driver, serial):
+    """Tai LAI trang (cung IP) lay captcha MOI - KHONG bam refresh. Tra (img, sig)."""
+    try: driver.get(APPLE_URL)
+    except:
+        try: driver.execute_script("window.stop();")
+        except: pass
+    time.sleep(4.0)
+    if looks_banned(driver): return None, None
+    el = find_serial_input(driver, timeout=12)
+    if not el: return None, None
+    smooth_type(driver, el, serial)
+    time.sleep(1.5)
+    return wait_captcha_ready(driver)
+
 def solve_captcha_loop(driver, serial):
-    scrolled = False
-    tried = set()       # cac ma DA gui -> khong gui trung
-    dup_count = 0       # so lan OCR ra ma trung (anh khong doi)
-
-    # ĐỢI captcha load xong NGAY TU DAU (khong OCR anh dang "Loading")
+    """CHIEN LUOC CHONG BAN: moi IP CHI gui 1 LAN khi CHAC CHAN.
+       - Chua chac -> TAI LAI trang (cung IP) lay captcha moi (KHONG refresh, KHONG gui).
+       - Gui sai -> tra False -> main DOI IP (khong thu lai tren IP da burn)."""
     img, sig = wait_captcha_ready(driver)
-    if img is None:
-        if looks_banned(driver): return "BANNED"
-        print("   [!] Không thấy/không load được captcha"); return "ERROR"
 
-    attempt = 0
-    while attempt < CAPTCHA_TRIES:
+    reads = 0
+    while reads < CAPTCHA_TRIES:
         if looks_banned(driver): return "BANNED"
+        if img is None:
+            print("   [!] Không load được captcha -> tải lại trang")
+            img, sig = reload_and_enter_serial(driver, serial); reads += 1; continue
 
         cin = find_captcha_input(driver)
-        if not img or not cin:
-            print("   [!] Mất ô captcha/ảnh -> thoát"); return "ERROR"
+        if not cin:
+            print("   [!] Không thấy ô captcha"); return "ERROR"
 
-        # Cuon toi captcha CHI 1 LAN (het giat giat)
-        if not scrolled:
-            try:
-                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
-                scrolled = True; time.sleep(0.5)
-            except: pass
+        try:
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
+            time.sleep(0.4)
+        except: pass
 
-        text, conf = read_captcha_text(driver, img)   # 2 model doi chieu
-        print(f"   captcha OCR (lần {attempt+1}/{CAPTCHA_TRIES}): {text} {'[chắc]' if conf else '[không chắc]'}")
+        text, conf = read_captcha_text(driver, img)   # 2 model x nhieu bien the
+        print(f"   captcha OCR (đọc {reads+1}/{CAPTCHA_TRIES}): {text} {'[chắc]' if conf else '[không chắc]'}")
 
-        # Sai dinh dang HOAC trung ma cu -> DOI ANH MOI (cho LOAD XONG) roi doc lai, KHONG gui
-        if not (4 <= len(text) <= 8) or text in tried:
-            ly_do = "khó đọc" if not (4 <= len(text) <= 8) else "trùng mã cũ"
-            print(f"   [!] {text} ({ly_do}) -> đổi ảnh mới (KHÔNG gửi)")
-            dup_count = dup_count + 1 if text in tried else 0
-            if dup_count >= 3:
-                print("   [!] Ảnh captcha không đổi -> RETRY đổi IP"); return False
-            img, sig = refresh_and_wait(driver, sig)
-            attempt += 1; continue
+        # CHUA CHAC / sai dinh dang -> TAI LAI trang lay captcha moi, TUYET DOI KHONG gui (tranh ban)
+        if not (4 <= len(text) <= 8) or not conf:
+            print("   [!] Chưa chắc -> tải lại trang lấy captcha mới (KHÔNG gửi, KHÔNG refresh)")
+            img, sig = reload_and_enter_serial(driver, serial)
+            reads += 1; continue
 
-        # KHONG chac (2 model khac nhau) + con nhieu luot -> doi anh ro hon, KHONG gui ma doan mo
-        if not conf and attempt < CAPTCHA_TRIES - 2:
-            print(f"   [!] {text} 2 model chưa khớp -> đổi ảnh rõ hơn (chưa gửi)")
-            img, sig = refresh_and_wait(driver, sig)
-            attempt += 1; continue
-
-        # GO ma + KIEM TRA da vao o chua + gui
-        tried.add(text)
+        # CHAC CHAN -> GUI DUY NHAT 1 LAN tren IP nay
         type_captcha(driver, cin, text)
         print(f"   -> Gửi mã: {text}")
-        status = submit_and_check(driver, cin, timeout=8)
+        status = submit_and_check(driver, cin, timeout=10)
         if status == "success": return True
         if status == "BANNED": return "BANNED"
-
-        # SAI -> bam refresh + ĐỢI anh moi LOAD XONG roi thu lai (khong spam anh chua load)
-        print("   [!] Mã sai -> đổi ảnh mới, đợi load xong...")
-        attempt += 1
-        try:
-            cin.click(); cin.send_keys(Keys.CONTROL + "a"); cin.send_keys(Keys.BACKSPACE)
-        except: pass
-        img, sig = refresh_and_wait(driver, sig)
-
-        s_box = find_serial_input(driver, timeout=2)
-        if s_box:
-            try:
-                val = driver.execute_script("return arguments[0].value;", s_box) or ""
-                if len(val) < 5: smooth_type(driver, s_box, serial)
-            except: pass
+        # SAI -> KHONG refresh, KHONG gui lai tren IP nay -> doi IP
+        print("   [!] Mã sai -> ĐỔI IP (không thử lại trên IP đã dùng)")
+        return False
 
     return False
 
@@ -549,7 +538,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v4.8 - OCR 2 model + nhieu bien the anh, lay dong thuan")
+    print("Apple Checker v5.0 - Moi IP chi GUI 1 LAN khi CHAC; chua chac thi tai lai trang; KHONG refresh")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
