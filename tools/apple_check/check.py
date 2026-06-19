@@ -226,10 +226,12 @@ def find_date(line):
 
 try:
     import ddddocr
-    _ocr = ddddocr.DdddOcr(show_ad=False)
+    _ocr = ddddocr.DdddOcr(show_ad=False)            # model thuong
+    try: _ocr2 = ddddocr.DdddOcr(show_ad=False, beta=True)   # model beta (doi chieu)
+    except Exception: _ocr2 = None
     AUTO_CAPTCHA = True
 except Exception:
-    _ocr = None; AUTO_CAPTCHA = False
+    _ocr = _ocr2 = None; AUTO_CAPTCHA = False
 
 def _find(driver, pairs):
     for by, val in pairs:
@@ -270,10 +272,34 @@ def find_refresh_captcha(driver):
         (By.CSS_SELECTOR, "#captcha-refresh-btn, .captcha-action button[type='button']"),
     ])
 
+def _ocr_clean(txt):
+    return re.sub(r'[^A-Za-z0-9]', '', (txt or '')).upper()
+
+def _img_variants(data):
+    """Tao nhieu phien ban anh da xu ly de OCR chinh xac hon."""
+    out = [data]   # anh goc
+    try:
+        from PIL import Image, ImageOps, ImageFilter
+        import io
+        base = Image.open(io.BytesIO(data)).convert("L")        # grayscale
+        w, h = base.size
+        if w < 450:
+            base = base.resize((w*3, h*3), Image.LANCZOS)       # phong to
+        variants = [
+            ImageOps.autocontrast(base),                        # tang tuong phan
+            base.filter(ImageFilter.SHARPEN),                   # lam net
+            base.point(lambda x: 0 if x < 128 else 255).convert("L"),  # nhi phan hoa
+            ImageOps.autocontrast(base.filter(ImageFilter.MedianFilter(3))),  # kho nhieu
+        ]
+        for im in variants:
+            buf = io.BytesIO(); im.save(buf, format="PNG"); out.append(buf.getvalue())
+    except: pass
+    return out
+
 def read_captcha_text(driver, img):
-    """Doc captcha CHINH XAC hon: lay anh goc net nhat + phong to 3x + grayscale + tang tuong phan."""
+    """OCR bang 2 model x nhieu bien the anh -> lay ket qua DONG THUAN (nhieu phieu nhat).
+       Tra (text, confident): confident=True khi >=2 lan OCR cho cung 1 ket qua."""
     data = None
-    # 1) Uu tien lay anh goc (data:image base64) -> net hon screenshot
     try:
         src = img.get_attribute("src") or ""
         if src.startswith("data:image"):
@@ -282,21 +308,19 @@ def read_captcha_text(driver, img):
     except: pass
     if not data:
         try: data = img.screenshot_as_png
-        except: return ""
-    # 2) Tien xu ly anh -> ddddocr doc dung hon nhieu
-    try:
-        from PIL import Image, ImageOps
-        import io
-        im = Image.open(io.BytesIO(data)).convert("L")          # grayscale
-        w, h = im.size
-        if w < 400:                                             # phong to anh nho
-            im = im.resize((w*3, h*3), Image.LANCZOS)
-        im = ImageOps.autocontrast(im)                          # tang tuong phan
-        buf = io.BytesIO(); im.save(buf, format="PNG"); data = buf.getvalue()
-    except: pass
-    try:
-        return re.sub(r'[^A-Za-z0-9]', '', _ocr.classification(data) or '').upper()
-    except: return ""
+        except: return "", False
+    from collections import Counter
+    votes = Counter()
+    for variant in _img_variants(data):
+        for eng in (_ocr, _ocr2):
+            if not eng: continue
+            try:
+                t = _ocr_clean(eng.classification(variant))
+                if 4 <= len(t) <= 8: votes[t] += 1
+            except: pass
+    if not votes: return "", False
+    top, cnt = votes.most_common(1)[0]
+    return top, (cnt >= 2)   # >=2 lan trung = tin cay cao
 
 def captcha_sig(img):
     """Chu ky anh captcha -> de biet anh CO DOI hay khong (tranh doc lai anh cu)."""
@@ -431,8 +455,8 @@ def solve_captcha_loop(driver, serial):
                 scrolled = True; time.sleep(0.5)
             except: pass
 
-        text = read_captcha_text(driver, img)   # doc anh ĐÃ LOAD XONG + phong to + grayscale
-        print(f"   captcha OCR (lần {attempt+1}/{CAPTCHA_TRIES}): {text}")
+        text, conf = read_captcha_text(driver, img)   # 2 model doi chieu
+        print(f"   captcha OCR (lần {attempt+1}/{CAPTCHA_TRIES}): {text} {'[chắc]' if conf else '[không chắc]'}")
 
         # Sai dinh dang HOAC trung ma cu -> DOI ANH MOI (cho LOAD XONG) roi doc lai, KHONG gui
         if not (4 <= len(text) <= 8) or text in tried:
@@ -441,6 +465,12 @@ def solve_captcha_loop(driver, serial):
             dup_count = dup_count + 1 if text in tried else 0
             if dup_count >= 3:
                 print("   [!] Ảnh captcha không đổi -> RETRY đổi IP"); return False
+            img, sig = refresh_and_wait(driver, sig)
+            attempt += 1; continue
+
+        # KHONG chac (2 model khac nhau) + con nhieu luot -> doi anh ro hon, KHONG gui ma doan mo
+        if not conf and attempt < CAPTCHA_TRIES - 2:
+            print(f"   [!] {text} 2 model chưa khớp -> đổi ảnh rõ hơn (chưa gửi)")
             img, sig = refresh_and_wait(driver, sig)
             attempt += 1; continue
 
@@ -519,7 +549,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v4.7 - Doi captcha LOAD XONG moi OCR (het spam anh chua load)")
+    print("Apple Checker v4.8 - OCR 2 model + nhieu bien the anh, lay dong thuan")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
