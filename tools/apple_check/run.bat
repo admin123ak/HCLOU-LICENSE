@@ -16,7 +16,7 @@ if errorlevel 1 (
 )
 echo Dang cai thu vien lan dau ^(cho ti...^)
 python -m pip install --upgrade pip >nul 2>&1
-python -m pip install selenium webdriver-manager openpyxl ddddocr undetected-chromedriver requests >nul 2>&1
+python -m pip install selenium webdriver-manager openpyxl ddddocr undetected-chromedriver requests Pillow >nul 2>&1
 echo Xong! Dang mo tool...
 echo.
 python check.py

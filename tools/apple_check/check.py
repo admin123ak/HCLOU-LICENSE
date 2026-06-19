@@ -1,4 +1,4 @@
-# Apple Serial Checker - v4.3 (Sua nut GUI serial-button + captcha linh hoat 4-8 ky tu)
+# Apple Serial Checker - v4.4 (moi serial = 1 trinh duyet moi, trang sach 100%)
 import os, time, json, re, random, openpyxl
 from collections import namedtuple
 from openpyxl.styles import PatternFill, Font
@@ -199,19 +199,14 @@ def find_serial_input(driver, timeout=10):
 
 def smooth_type(driver, el, text):
     try:
-        driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", el)
-        time.sleep(0.4)
         el.click()
         el.send_keys(Keys.CONTROL + "a")
-        time.sleep(0.1)
         el.send_keys(Keys.BACKSPACE)
         time.sleep(0.2)
-        driver.execute_script("arguments[0].value = '';", el)
-        time.sleep(0.3)
         for char in text:
             el.send_keys(char)
-            time.sleep(random.uniform(0.08, 0.18)) 
-        time.sleep(0.4)
+            time.sleep(random.uniform(0.07, 0.15))
+        time.sleep(0.3)
     except: pass
 
 def find_model(driver):
@@ -275,6 +270,34 @@ def find_refresh_captcha(driver):
         (By.CSS_SELECTOR, "#captcha-refresh-btn, .captcha-action button[type='button']"),
     ])
 
+def read_captcha_text(driver, img):
+    """Doc captcha CHINH XAC hon: lay anh goc net nhat + phong to 3x + grayscale + tang tuong phan."""
+    data = None
+    # 1) Uu tien lay anh goc (data:image base64) -> net hon screenshot
+    try:
+        src = img.get_attribute("src") or ""
+        if src.startswith("data:image"):
+            import base64
+            data = base64.b64decode(src.split(",", 1)[1])
+    except: pass
+    if not data:
+        try: data = img.screenshot_as_png
+        except: return ""
+    # 2) Tien xu ly anh -> ddddocr doc dung hon nhieu
+    try:
+        from PIL import Image, ImageOps
+        import io
+        im = Image.open(io.BytesIO(data)).convert("L")          # grayscale
+        w, h = im.size
+        if w < 400:                                             # phong to anh nho
+            im = im.resize((w*3, h*3), Image.LANCZOS)
+        im = ImageOps.autocontrast(im)                          # tang tuong phan
+        buf = io.BytesIO(); im.save(buf, format="PNG"); data = buf.getvalue()
+    except: pass
+    try:
+        return re.sub(r'[^A-Za-z0-9]', '', _ocr.classification(data) or '').upper()
+    except: return ""
+
 def looks_banned(driver):
     try: b = driver.find_element(By.TAG_NAME, "body").text.lower()
     except: return False
@@ -320,33 +343,34 @@ def submit_and_check(driver, cin_element, timeout=8):
 # ==============================================================================
 def solve_captcha_loop(driver, serial):
     attempt = 0
-    blank_counter = 0  
-    
+    blank_counter = 0
+    scrolled = False
+
     while attempt < CAPTCHA_TRIES:
         if looks_banned(driver): return "BANNED"
-            
+
         img = find_captcha_img(driver)
         cin = find_captcha_input(driver)
-        
+
         if not img or not cin:
             if looks_banned(driver): return "BANNED"
             blank_counter += 1
-            if blank_counter > 5: 
+            if blank_counter > 5:
                 print("   [!] Web kẹt. Thoát phiên...")
                 return "ERROR"
-            time.sleep(3.0); continue 
-            
-        blank_counter = 0  
-        
-        try:
-            driver.execute_script("arguments[0].scrollIntoView({behavior: 'auto', block: 'center'});", img)
-            time.sleep(1.0) 
-            png = img.screenshot_as_png
-        except:
-            time.sleep(1.0); continue
-            
+            time.sleep(3.0); continue
+
+        blank_counter = 0
+
+        # Cuon toi captcha CHI 1 LAN (het giat giat)
+        if not scrolled:
+            try:
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
+                scrolled = True; time.sleep(0.8)
+            except: pass
+
         print(f"   captcha OCR (lan {attempt+1}/{CAPTCHA_TRIES}): Đang giải mã...")
-        text = re.sub(r'[^A-Za-z0-9]', '', _ocr.classification(png) or '').upper()
+        text = read_captcha_text(driver, img)   # doc anh net + phong to + grayscale
 
         # Captcha Apple maxLength=12, thuc te 4-8 ky tu -> chap nhan dai linh hoat (KHONG khoa cung 4)
         if not (4 <= len(text) <= 8):
@@ -439,7 +463,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v4.3 - Sua nut GUI + captcha linh hoat")
+    print("Apple Checker v4.4 - Moi serial 1 trinh duyet moi (trang sach)")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
@@ -460,53 +484,55 @@ def main():
         print("   [+] Chờ 12 giây cho cổng proxy khởi động mượt mà...")
         time.sleep(12)
         
-    d = create_browser(cur_proxy); done_on_ip = 0
-    
+    done_on_ip = 0
     try:
         idx = 0
         while idx < len(serials_to_check):
             real_idx, s = serials_to_check[idx]
+
+            # Đổi IP định kỳ (sau mỗi BATCH_PER_IP serial)
+            if done_on_ip >= BATCH_PER_IP:
+                print(f"\n>>> Đã check {BATCH_PER_IP} mã trên IP này. Đổi IP...")
+                if (PROXY_API_URL or PROXY_KEY):
+                    new = fetch_rotating_proxy()
+                    if new: cur_proxy = new
+                print("   [+] Chờ 15 giây cho IP mới ổn định...")
+                time.sleep(15)
+                done_on_ip = 0
+
+            # ===== MỖI SERIAL = 1 TRÌNH DUYỆT MỚI (trang sạch 100%, không dính state serial trước) =====
+            d = create_browser(cur_proxy)
             try:
-                if done_on_ip >= BATCH_PER_IP:
-                    try: d.quit()
-                    except: pass
-                    print(f"\n>>> Đã check xong {BATCH_PER_IP} mã. Đổi IP định kỳ...")
-                    if (PROXY_API_URL or PROXY_KEY):
-                        new = fetch_rotating_proxy()
-                        if new: cur_proxy = new
-                    print("   [+] Chờ 15 giây cho IP mới ổn định kết nối...")
-                    time.sleep(15)
-                    d = create_browser(cur_proxy); done_on_ip = 0
-
                 r = handle(d, s, real_idx, len(master_serials))
-
-                if r.status in ("BANNED", "RETRY", "TIMEOUT", "ERROR"):
-                    retry_count[s] = retry_count.get(s, 0) + 1
-                    if retry_count[s] > MAX_RETRY:
-                        existing_results[s] = r; idx += 1; done_on_ip += 1
-                        save_results(master_serials, existing_results); continue
-
-                    print(f"   [!] Gặp lỗi ({r.status}). Đóng trình duyệt, đổi IP sau 20 giây hạ nhiệt...")
-                    try: d.quit()
-                    except: pass
-                    if (PROXY_API_URL or PROXY_KEY):
-                        new = fetch_rotating_proxy()
-                        if new: cur_proxy = new
-                    time.sleep(20) 
-                    d = create_browser(cur_proxy); done_on_ip = 0
-                    continue   
-
-                existing_results[s] = r; idx += 1; done_on_ip += 1
-                save_results(master_serials, existing_results)
-                if idx < len(serials_to_check): human_pause(d)   
-            except:
-                try: d.quit()
+            except Exception:
+                r = Result(s, "ERROR", "", "", "")
+            finally:
+                try: d.quit()          # ĐÓNG trang ngay sau mỗi serial
                 except: pass
-                time.sleep(5)
-                d = create_browser(cur_proxy); done_on_ip = 0
+
+            # Lỗi/ban -> đổi IP + thử lại CHÍNH serial này (vòng sau mở browser mới)
+            if r.status in ("BANNED", "RETRY", "TIMEOUT", "ERROR"):
+                retry_count[s] = retry_count.get(s, 0) + 1
+                if retry_count[s] > MAX_RETRY:
+                    existing_results[s] = r; idx += 1; done_on_ip += 1
+                    save_results(master_serials, existing_results)
+                    print(f"   [!] {s} thử {MAX_RETRY} lần không được -> bỏ qua ({r.status})")
+                    continue
+                print(f"   [!] Lỗi ({r.status}) -> đổi IP, thử lại sau 15s...")
+                if (PROXY_API_URL or PROXY_KEY):
+                    new = fetch_rotating_proxy()
+                    if new: cur_proxy = new
+                time.sleep(15)
+                done_on_ip = 0
+                continue   # KHÔNG tăng idx -> thử lại serial này
+
+            # Thành công -> LƯU rồi serial tiếp theo
+            existing_results[s] = r; idx += 1; done_on_ip += 1
+            save_results(master_serials, existing_results)
+            print(f"   -> Đã lưu kết quả ({r.status})")
+            if idx < len(serials_to_check):
+                time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))   # nghỉ giống người
     finally:
-        try: d.quit()
-        except: pass
         set_anti_sleep(False)
         save_results(master_serials, existing_results)
         print("\n===== HOÀN THÀNH TASK =====")
