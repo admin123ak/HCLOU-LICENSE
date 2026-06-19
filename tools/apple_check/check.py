@@ -579,12 +579,15 @@ def handle(driver, serial, i, total):
         if pur or exp or mdl:
             print(f"Trạng thái: Activated | Model: {mdl} | Mua: {pur}")
             return Result(serial, "Activated", mdl, pur, exp)
-            
-        return Result(serial, "Unknown", "", "", "")
+
+        # KHONG ra ket qua ro rang (co the captcha SAI / trang loi) -> RETRY doi IP,
+        # TUYET DOI KHONG luu Unknown roi bo qua. Chi luu khi co ket qua THAT.
+        print("   [!] Chưa có kết quả rõ ràng (captcha có thể sai) -> RETRY đổi IP")
+        return Result(serial, "RETRY", "", "", "")
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v5.9 - Nhan dien THANH CONG bang captcha bien mat (het bao retry oan + spam serial)")
+    print("Apple Checker v6.0 - CHI luu khi co ket qua THAT (Activated/Unactivated/Invalid); chua ro -> doi IP thu lai")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
@@ -598,7 +601,7 @@ def main():
         print("\n===== TẤT CẢ MÃ ĐÃ HOÀN THÀNH SẠCH SẼ! ====="); return
     
     set_anti_sleep(True)
-    retry_count = {}; MAX_RETRY = 4
+    retry_count = {}; MAX_RETRY = 6
     cur_proxy = fetch_rotating_proxy() if (PROXY_API_URL or PROXY_KEY) else (PROXY or None)
     
     if cur_proxy:
@@ -631,15 +634,17 @@ def main():
                 try: d.quit()          # ĐÓNG trang ngay sau mỗi serial
                 except: pass
 
-            # Lỗi/ban -> đổi IP + thử lại CHÍNH serial này (vòng sau mở browser mới)
+            # Lỗi/ban/chưa rõ -> đổi IP + thử lại CHÍNH serial này (KHÔNG lưu, KHÔNG bỏ qua)
             if r.status in ("BANNED", "RETRY", "TIMEOUT", "ERROR"):
                 retry_count[s] = retry_count.get(s, 0) + 1
                 if retry_count[s] > MAX_RETRY:
-                    existing_results[s] = r; idx += 1; done_on_ip += 1
+                    # Thu het cach van khong ra ket qua -> danh dau Unknown de dung (chay lai sau van se thu lai)
+                    existing_results[s] = Result(s, "Unknown", "", "", "")
+                    idx += 1; done_on_ip += 1
                     save_results(master_serials, existing_results)
-                    print(f"   [!] {s} thử {MAX_RETRY} lần không được -> bỏ qua ({r.status})")
+                    print(f"   [!] {s} thử {MAX_RETRY} lần vẫn chưa ra kết quả -> tạm bỏ qua (Unknown)")
                     continue
-                print(f"   [!] Lỗi ({r.status}) -> đổi IP, thử lại sau 8s...")
+                print(f"   [!] {r.status} -> đổi IP, thử lại serial này sau 8s ({retry_count[s]}/{MAX_RETRY})...")
                 if (PROXY_API_URL or PROXY_KEY):
                     new = fetch_rotating_proxy()
                     if new: cur_proxy = new
