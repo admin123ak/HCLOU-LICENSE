@@ -406,25 +406,36 @@ def submit_and_check(driver, cin_element, timeout=10):
     try: cin_element.send_keys(Keys.ENTER)
     except: pass
 
+    time.sleep(1.5)   # cho trang phan hoi
     end_time = time.time() + timeout
     while time.time() < end_time:
-        try: 
-            b = driver.find_element(By.TAG_NAME, "body").text.lower()
+        try:
             if looks_banned(driver): return "BANNED"
-            
-            if any(k in b for k in ["không chính xác", "khong chinh xac", "thử lại", "sai mã", "incorrect", "try again"]):
+            b = driver.find_element(By.TAG_NAME, "body").text.lower()
+
+            # SAI captcha (Apple bao loi) -> giu nguyen o captcha
+            if any(k in b for k in ["mã xác minh không chính xác", "captcha không chính xác",
+                                     "không chính xác", "khong chinh xac", "sai mã", "incorrect captcha",
+                                     "verification code", "try again"]):
                 return "wrong_captcha"
-                
-            if any(k in b for k in ["số sê-ri không hợp lệ", "invalid serial", "không thể tìm thấy"]):
-                return "success"
-                
-            s_box = find_serial_input(driver, timeout=1)
-            if s_box is None or not s_box.is_displayed():
-                if any(k in b for k in ["ngày mua", "kich hoat", "kích hoạt", "hợp lệ", "đã mua", "bảo hành"]):
+
+            # THANH CONG = QUA captcha = ANH CAPTCHA BIEN MAT HAN (da sang trang ket qua)
+            # (tin hieu chac chan nhat, khong phu thuoc chu nghia). Xac nhan kep tranh luc chuyen anh.
+            if find_captcha_img(driver) is None:
+                time.sleep(1.0)
+                if find_captcha_img(driver) is None:
                     return "success"
+
+            # Hoac trang da hien ket qua ro rang
+            if any(k in b for k in ["số sê-ri không hợp lệ", "invalid serial", "không thể tìm thấy",
+                                     "ngày mua", "đã mua", "kích hoạt", "bảo hành", "hết hạn",
+                                     "applecare", "đủ điều kiện", "ngày hết hạn"]):
+                return "success"
         except: pass
         time.sleep(0.5)
-    return "CHECKING" 
+    # Het gio ma captcha bien mat -> coi nhu qua
+    if find_captcha_img(driver) is None: return "success"
+    return "CHECKING"
 
 # ==============================================================================
 # BẢN VÁ v4.2: CHỐT CỨNG CHỈ GỬI KHI ĐỦ 4 KÝ TỰ
@@ -573,7 +584,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v5.8 - Go that tung phim + bam nut Gui chac chan (doi nut bat + click + ENTER) + log ro")
+    print("Apple Checker v5.9 - Nhan dien THANH CONG bang captcha bien mat (het bao retry oan + spam serial)")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
