@@ -402,20 +402,39 @@ def submit_and_check(driver, cin_element, timeout=8):
 # ==============================================================================
 # BẢN VÁ v4.2: CHỐT CỨNG CHỈ GỬI KHI ĐỦ 4 KÝ TỰ
 # ==============================================================================
+def _get_val(driver, el):
+    try: return (driver.execute_script("return arguments[0].value;", el) or "").upper().replace(" ", "")
+    except: return ""
+
 def type_captcha(driver, cin, text):
-    """Go ma vao o + KIEM TRA da vao chua, chua thi ep bang JS (React)."""
-    smooth_type(driver, cin, text)
-    time.sleep(0.4)
-    try: cur = (driver.execute_script("return arguments[0].value;", cin) or "")
-    except: cur = ""
-    if cur.upper().replace(" ", "") != text:
-        try:
-            driver.execute_script(
-                "var e=arguments[0],v=arguments[1];e.focus();e.value=v;"
-                "['input','change','blur'].forEach(function(n){e.dispatchEvent(new Event(n,{bubbles:true}));});",
-                cin, text)
-            time.sleep(0.3)
-        except: pass
+    """Nhap ma vao o React (Apple). Dung NATIVE SETTER cua React (cach chuan) + verify."""
+    # 1) Cach CHUAN cho React controlled input: dung native value setter roi ban event 'input'
+    try:
+        driver.execute_script("""
+        var el=arguments[0], val=arguments[1];
+        el.focus();
+        var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+        setter.call(el,'');
+        el.dispatchEvent(new Event('input',{bubbles:true}));
+        setter.call(el,val);
+        el.dispatchEvent(new Event('input',{bubbles:true}));
+        el.dispatchEvent(new Event('change',{bubbles:true}));
+        """, cin, text)
+        time.sleep(0.3)
+    except: pass
+    if _get_val(driver, cin) == text: return True
+    # 2) Fallback: go tay tung ky tu
+    try:
+        cin.click()
+        cin.send_keys(Keys.CONTROL + "a"); cin.send_keys(Keys.BACKSPACE)
+        time.sleep(0.2)
+        for ch in text:
+            cin.send_keys(ch); time.sleep(random.uniform(0.06, 0.13))
+        time.sleep(0.3)
+    except: pass
+    ok = _get_val(driver, cin) == text
+    if not ok: print(f"   [!] CHƯA gõ được mã vào ô (ô value='{_get_val(driver,cin)}')")
+    return ok
 
 APPLE_URL = "https://checkcoverage.apple.com/?locale=vi_VN"
 
@@ -464,7 +483,9 @@ def solve_captcha_loop(driver, serial):
             print("   [!] Vẫn khó đọc -> đổi IP"); return False
 
     # GUI 1 LAN tren IP nay (du strong hay khong - vi refresh nhieu cung bi ban).
-    type_captcha(driver, cin, text)
+    if not type_captcha(driver, cin, text):
+        print("   [!] Không gõ được mã vào ô -> đổi IP (KHÔNG gửi rỗng = tránh ban)")
+        return False
     print(f"   -> Gửi mã: {text}")
     status = submit_and_check(driver, cin, timeout=10)
     if status == "success": return True
@@ -522,7 +543,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v5.5 - Doc 1 lan + GUI luon (toi da 1 refresh neu rac). Het spam load")
+    print("Apple Checker v5.6 - Nhap captcha bang React native setter (fix khong go duoc); khong go duoc thi KHONG gui rong")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
