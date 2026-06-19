@@ -298,6 +298,27 @@ def read_captcha_text(driver, img):
         return re.sub(r'[^A-Za-z0-9]', '', _ocr.classification(data) or '').upper()
     except: return ""
 
+def captcha_sig(img):
+    """Chu ky anh captcha -> de biet anh CO DOI hay khong (tranh doc lai anh cu)."""
+    try:
+        s = img.get_attribute("src") or ""
+        if s: return s[-160:]
+    except: pass
+    try: return str(len(img.screenshot_as_png))
+    except: return ""
+
+def force_new_captcha(driver, old_img, timeout=6):
+    """Bam refresh + DOI cho anh THAT SU doi moi (khong dung anh cu). Tra img moi."""
+    old = captcha_sig(old_img) if old_img else ""
+    find_refresh_captcha(driver)
+    end = time.time() + timeout
+    while time.time() < end:
+        img = find_captcha_img(driver)
+        if img and captcha_sig(img) != old:
+            return img            # anh da doi moi
+        time.sleep(0.5)
+    return find_captcha_img(driver)
+
 def looks_banned(driver):
     try: b = driver.find_element(By.TAG_NAME, "body").text.lower()
     except: return False
@@ -341,10 +362,27 @@ def submit_and_check(driver, cin_element, timeout=8):
 # ==============================================================================
 # BẢN VÁ v4.2: CHỐT CỨNG CHỈ GỬI KHI ĐỦ 4 KÝ TỰ
 # ==============================================================================
+def type_captcha(driver, cin, text):
+    """Go ma vao o + KIEM TRA da vao chua, chua thi ep bang JS (React)."""
+    smooth_type(driver, cin, text)
+    time.sleep(0.4)
+    try: cur = (driver.execute_script("return arguments[0].value;", cin) or "")
+    except: cur = ""
+    if cur.upper().replace(" ", "") != text:
+        try:
+            driver.execute_script(
+                "var e=arguments[0],v=arguments[1];e.focus();e.value=v;"
+                "['input','change','blur'].forEach(function(n){e.dispatchEvent(new Event(n,{bubbles:true}));});",
+                cin, text)
+            time.sleep(0.3)
+        except: pass
+
 def solve_captcha_loop(driver, serial):
     attempt = 0
     blank_counter = 0
     scrolled = False
+    tried = set()       # cac ma DA gui -> khong gui trung
+    dup_count = 0       # so lan OCR ra ma trung (anh khong doi)
 
     while attempt < CAPTCHA_TRIES:
         if looks_banned(driver): return "BANNED"
@@ -369,48 +407,50 @@ def solve_captcha_loop(driver, serial):
                 scrolled = True; time.sleep(0.8)
             except: pass
 
-        print(f"   captcha OCR (lan {attempt+1}/{CAPTCHA_TRIES}): Đang giải mã...")
         text = read_captcha_text(driver, img)   # doc anh net + phong to + grayscale
+        print(f"   captcha OCR (lần {attempt+1}/{CAPTCHA_TRIES}): {text}")
 
-        # Captcha Apple maxLength=12, thuc te 4-8 ky tu -> chap nhan dai linh hoat (KHONG khoa cung 4)
+        # Sai dinh dang -> DOI ANH MOI (cho doi that) roi doc lai
         if not (4 <= len(text) <= 8):
-            print(f"   [!] Mã OCR sai định dạng ({text} - {len(text)} ký tự, cần 4-8). Làm mới ảnh, thử lại...")
-            find_refresh_captcha(driver) and time.sleep(1.8)
-            attempt += 1
-            time.sleep(1.5)
-            continue
+            print(f"   [!] OCR khó đọc ({text}) -> đổi ảnh mới")
+            img = force_new_captcha(driver, img)
+            attempt += 1; time.sleep(0.8); continue
 
-        print(f"   -> Mã gửi đi: {text} ({len(text)} ký tự)")
-        
-        time.sleep(random.uniform(1.0, 1.8)) 
-        smooth_type(driver, cin, text) 
-        
-        time.sleep(0.5)
-        
-        status = submit_and_check(driver, cin, timeout=8) 
-        if status == "success": return True 
+        # Ma TRUNG ma da thu -> KHONG gui lai (tranh spam cung 1 ma), doi anh moi
+        if text in tried:
+            dup_count += 1
+            print(f"   [!] Mã '{text}' đã thử rồi -> đổi ảnh mới (không gửi trùng)")
+            img = force_new_captcha(driver, img)
+            if dup_count >= 3:   # refresh hoai van trung -> thoat de doi IP/browser
+                print("   [!] Ảnh captcha không đổi -> RETRY đổi IP")
+                return False
+            time.sleep(0.6); continue   # KHONG tang attempt (chua gui)
+        dup_count = 0
+        tried.add(text)
+
+        # GO ma vao o (co kiem tra + ep JS neu chua vao)
+        type_captcha(driver, cin, text)
+        print(f"   -> Gửi mã: {text}")
+
+        status = submit_and_check(driver, cin, timeout=8)
+        if status == "success": return True
         if status == "BANNED": return "BANNED"
-        
-        print("   [!] Mã sai. Xóa ô nhập + bấm nút làm mới captcha lấy ảnh mới...")
+
+        # SAI -> DOI ANH MOI (doi cho anh doi that) roi thu lai
+        print("   [!] Mã sai -> đổi ảnh mới, thử lại...")
         attempt += 1
-
         try:
-            cin.click()
-            cin.send_keys(Keys.CONTROL + "a")
-            cin.send_keys(Keys.BACKSPACE)
+            cin.click(); cin.send_keys(Keys.CONTROL + "a"); cin.send_keys(Keys.BACKSPACE)
         except: pass
+        img = force_new_captcha(driver, img)
 
-        find_refresh_captcha(driver)   # bam captcha-refresh-btn -> anh moi
-        time.sleep(3.0)
-        
         s_box = find_serial_input(driver, timeout=2)
         if s_box:
             try:
-                val = driver.execute_script("return arguments[0].value;", s_box)
-                if not val or len(val) < 5:
-                    smooth_type(driver, s_box, serial)
+                val = driver.execute_script("return arguments[0].value;", s_box) or ""
+                if len(val) < 5: smooth_type(driver, s_box, serial)
             except: pass
-            
+
     return False
 
 def handle(driver, serial, i, total):
