@@ -21,15 +21,40 @@ PROGRESS_FILE="progress.json"; RESULT_FILE="results.xlsx"; INPUT_FILE="serials.x
 
 # ===== CHONG BAN =====
 # ===== PROXY XOAY proxyxoay.shop (proxy.vn) =====
-#  Dan link API get.php (co key) vao PROXY_API_URL. Moi lan goi = doi IP + tra proxy MOI.
-#  Lay link o: proxy.vn -> API xoay. Vi du:
-#  PROXY_API_URL="https://proxyxoay.shop/api/get.php?key=KEY_CUA_BAN&nhamang=Random&tinhthanh=0"
-PROXY_API_URL=""
+#  CACH DE NHAT: tao file "proxy_key.txt" cung thu muc, dan KEY proxy vao do.
+#  Vd noi dung proxy_key.txt:  auTIIHkBKzsXULfICziAVb
+#  Tool se TU whitelist IP may ban + tu doi IP. KHONG can sua gi them.
+PROXY_KEY=""            # hoac dan thang key vao day (trong "")
+PROXY_NHAMANG="Random"  # Random / viettel / fpt / vnpt
+PROXY_TINH="0"          # 0=Random, 3=Ha Noi, 6=HCM ...
+PROXY_API_URL=""        # (nang cao) dan full link get.php neu muon tu chinh
 PROXY_MIN_SEC=62        # goi proxy gioi han doi IP toi thieu 60s -> de 62s cho chac
+PROXY=""                # (tuy chon) proxy co dinh "host:port"
 
-# (Tuy chon) proxy CO DINH neu khong dung API xoay: "host:port" hoac "user:pass@host:port"
-PROXY=""
-# Neu KHONG dien ca 2 -> dung Proton VPN tay.
+# Doc key tu file proxy_key.txt (de nguoi khong rich khoi sua .py)
+try:
+    if os.path.exists("proxy_key.txt"):
+        _k=open("proxy_key.txt",encoding="utf-8").read().strip()
+        if _k: PROXY_KEY=_k
+except: pass
+
+_my_ip=[None]
+def my_public_ip():
+    if _my_ip[0] is not None: return _my_ip[0]
+    try:
+        import requests
+        _my_ip[0]=requests.get("https://api.ipify.org",timeout=10).text.strip()
+    except: _my_ip[0]=""
+    return _my_ip[0]
+
+def _build_proxy_url():
+    if PROXY_API_URL: return PROXY_API_URL
+    if PROXY_KEY:
+        u=f"https://proxyxoay.shop/api/get.php?key={PROXY_KEY}&nhamang={PROXY_NHAMANG}&tinhthanh={PROXY_TINH}"
+        wl=my_public_ip()
+        if wl: u+=f"&whitelist={wl}"   # tu whitelist IP may dang chay
+        return u
+    return ""
 
 BATCH_PER_IP=6          # check bao nhieu serial thi DOI IP
 DELAY_MIN, DELAY_MAX=6, 14   # nghi ngau nhien giua moi serial (giay) - giong nguoi
@@ -44,14 +69,15 @@ _last_change=[0.0]
 def fetch_rotating_proxy():
     """Goi API proxyxoay.shop -> tra 'host:port' proxy moi (da doi IP). None neu loi.
        Ton trong gioi han doi IP toi thieu PROXY_MIN_SEC giay."""
-    if not PROXY_API_URL: return None
+    url=_build_proxy_url()
+    if not url: return None
     wait=PROXY_MIN_SEC-(time.time()-_last_change[0])
     if wait>0:
         print(f"   (cho {int(wait)}s cho du gioi han doi IP {PROXY_MIN_SEC}s)...")
         time.sleep(wait+0.5)
     try:
         import requests
-        j=requests.get(PROXY_API_URL,timeout=45).json()
+        j=requests.get(url,timeout=45).json()
         if str(j.get("status"))!="100":
             print("   !! API proxy bao loi:", j.get("message") or j); return None
         raw=(j.get("proxyhttp") or "").strip()          # "host:port::"
@@ -390,12 +416,12 @@ def main():
     if not serials: print("Khong co serial nao trong serials.xlsx (bat dau o A2)"); return
     print("Da nap",len(serials),"serial")
     i,results=load_progress()
-    mode = "PROXY XOAY (API)" if PROXY_API_URL else ("PROXY co dinh" if PROXY else "VPN tay")
+    mode = "PROXY XOAY (API)" if (PROXY_API_URL or PROXY_KEY) else ("PROXY co dinh" if PROXY else "VPN tay")
     print(f">> Che do: TREO={'BAT' if UNATTENDED else 'TAT'} | IP={mode} | doi IP moi {BATCH_PER_IP} serial | undetected={'BAT' if HAS_UC else 'TAT'}")
-    if UNATTENDED and not PROXY_API_URL:
+    if UNATTENDED and not (PROXY_API_URL or PROXY_KEY):
         print("!! CANH BAO: Che do TREO can PROXY_API_URL (de tu doi IP). Chua co proxy -> se phai cho VPN tay, KHONG treo duoc.")
     retry_count={}; MAX_RETRY=4
-    cur_proxy = fetch_rotating_proxy() if PROXY_API_URL else (PROXY or None)
+    cur_proxy = fetch_rotating_proxy() if (PROXY_API_URL or PROXY_KEY) else (PROXY or None)
     d=create_browser(cur_proxy)
     done_on_ip=0
     while i<len(serials):
@@ -405,7 +431,7 @@ def main():
                 try: d.quit()
                 except: pass
                 print(f"\n>>> Da check {BATCH_PER_IP} serial tren IP nay.")
-                if PROXY_API_URL:
+                if (PROXY_API_URL or PROXY_KEY):
                     new=fetch_rotating_proxy()      # goi API -> doi IP + proxy moi
                     if new: cur_proxy=new
                 elif PROXY:
@@ -430,7 +456,7 @@ def main():
                 print(f"   !! {r.status} -> doi IP roi thu lai (lan {retry_count[serials[i]]}/{MAX_RETRY})")
                 try: d.quit()
                 except: pass
-                if PROXY_API_URL:
+                if (PROXY_API_URL or PROXY_KEY):
                     new=fetch_rotating_proxy()
                     if new: cur_proxy=new
                 elif PROXY:
