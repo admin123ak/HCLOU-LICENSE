@@ -209,24 +209,24 @@ def _find(driver, pairs):
     return None
 
 def find_captcha_img(driver):
+    # selector THAT cua Apple: captcha-image (+ container)
     return _find(driver,[
+        (By.ID,"captcha-image"),
+        (By.CSS_SELECTOR,"img.captcha-image, #captcha-image img, .captcha-image-container img, .captcha-image-section img"),
+        (By.CSS_SELECTOR,"[class*='captcha-image'] img"),
         (By.CSS_SELECTOR,"img[src*='captcha']"),
-        (By.CSS_SELECTOR,"img[alt*='captcha' i]"),
-        (By.XPATH,"//img[contains(@id,'captcha') or contains(@class,'captcha')]"),
-        (By.XPATH,"//*[contains(@class,'captcha')]//img"),
         (By.CSS_SELECTOR,"img[src^='data:image']"),
     ])
 def find_captcha_input(driver, serial_el=None):
-    """Tim DUNG o captcha: uu tien o ngay canh anh captcha, KHONG nham o serial."""
-    # 1) selector ten captcha
+    """O nhap captcha THAT cua Apple: captcha-textbox (trong captcha-input-box)."""
     el=_find(driver,[
-        (By.ID,"captcha-input"),
-        (By.CSS_SELECTOR,"input[name*='captcha' i]"),
-        (By.CSS_SELECTOR,"input[aria-label*='captcha' i]"),
-        (By.XPATH,"//input[contains(@id,'captcha')]"),
+        (By.ID,"captcha-textbox"),
+        (By.CSS_SELECTOR,"input.captcha-textbox, #captcha-textbox, .captcha-input-box input, .captcha-field-box input"),
+        (By.CSS_SELECTOR,"[class*='captcha-textbox']"),
+        (By.CSS_SELECTOR,"input[id*='captcha' i], input[name*='captcha' i]"),
     ])
     if el and el!=serial_el: return el
-    # 2) o text cung khung voi anh captcha
+    # Du phong: o text cung khung voi anh captcha
     img=find_captcha_img(driver)
     if img:
         try:
@@ -234,18 +234,13 @@ def find_captcha_input(driver, serial_el=None):
             for inp in box.find_elements(By.XPATH,".//input[@type='text' or not(@type)]"):
                 if inp.is_displayed() and inp!=serial_el: return inp
         except: pass
-    # 3) o text dang hien, khac o serial, dang rong (captcha thuong la o cuoi)
-    cands=[]
-    for inp in driver.find_elements(By.XPATH,"//input[@type='text' or not(@type) or @type='tel']"):
-        try:
-            if inp.is_displayed() and inp!=serial_el and not (inp.get_attribute("value") or ""):
-                cands.append(inp)
-        except: pass
-    return cands[-1] if cands else None
+    return None
 def find_continue(driver):
+    # nut submit THAT: captcha-action / captcha-btn / trong captcha-form-element
     return _find(driver,[
-        (By.XPATH,"//button[contains(.,'Tiếp tục') or contains(.,'Continue') or contains(.,'Tiep tuc')]"),
-        (By.ID,"continue-button"),
+        (By.ID,"captcha-action"),
+        (By.CSS_SELECTOR,"#captcha-action, .captcha-btn, #captcha-form-element button[type='submit'], .captcha-form-element button"),
+        (By.XPATH,"//button[contains(.,'Tiếp tục') or contains(.,'Continue') or contains(.,'Gửi') or contains(.,'Submit')]"),
         (By.CSS_SELECTOR,"button[type='submit']"),
     ])
 
@@ -280,9 +275,23 @@ def submit_and_wait(driver, timeout=25):
         time.sleep(1)
     return "timeout"
 
+def wait_captcha_loaded(driver, timeout=18):
+    """Cho anh captcha hien (trang co 'Loading CAPTCHA' truoc khi load xong)."""
+    end=time.time()+timeout
+    while time.time()<end:
+        img=find_captcha_img(driver)
+        if img:
+            try:
+                # anh da load that (co kich thuoc), khong phai placeholder
+                if img.size.get('width',0)>10: return img
+            except: return img
+        time.sleep(1)
+    return find_captcha_img(driver)
+
 def solve_captcha_auto(driver,serial_el,serial):
     """Giai captcha tu dong (ddddocr) - go cham + submit + DOI ket qua. Thu toi 4 lan.
        True=qua / False=OCR sai het / None=khong tim thay o -> nhap tay."""
+    wait_captcha_loaded(driver)   # cho captcha load xong
     for attempt in range(4):
         img=find_captcha_img(driver); cin=find_captcha_input(driver,serial_el)
         if not img or not cin:
