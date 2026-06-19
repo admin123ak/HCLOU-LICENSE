@@ -1,4 +1,4 @@
-# Apple Serial Checker - Bản v4.2 (Chốt Chặt 4 Ký Tự)
+# Apple Serial Checker - v4.3 (Sua nut GUI serial-button + captcha linh hoat 4-8 ky tu)
 import os, time, json, re, random, openpyxl
 from collections import namedtuple
 from openpyxl.styles import PatternFill, Font
@@ -259,11 +259,20 @@ def find_captcha_input(driver):
     ])
 
 def find_continue(driver):
+    # NUT GUI THAT = serial-button (type=submit, duy nhat 1 cai tren trang).
+    # TUYET DOI KHONG dung captcha-action -> do la vung nut REFRESH (captcha-refresh-btn)!
     return _find(driver, [
+        (By.CSS_SELECTOR, ".serial-button button"),
+        (By.XPATH, "//div[contains(@class,'serial-button')]//button"),
         (By.CSS_SELECTOR, "button[type='submit']"),
-        (By.XPATH, "//button[contains(text(), 'Gửi') or contains(text(), 'Submit') or contains(text(), 'Continue') or contains(text(), 'Tiếp tục')]"),
-        (By.ID, "captcha-action"),
-        (By.CSS_SELECTOR, "button.form-button, [class*='submit'] button, [class*='continue'] button"),
+        (By.XPATH, "//button[@type='submit' and (contains(.,'Gửi') or contains(.,'Continue') or contains(.,'Tiếp tục'))]"),
+    ])
+
+def find_refresh_captcha(driver):
+    # Nut lam moi captcha THAT cua Apple
+    return _find(driver, [
+        (By.ID, "captcha-refresh-btn"),
+        (By.CSS_SELECTOR, "#captcha-refresh-btn, .captcha-action button[type='button']"),
     ])
 
 def looks_banned(driver):
@@ -338,15 +347,16 @@ def solve_captcha_loop(driver, serial):
             
         print(f"   captcha OCR (lan {attempt+1}/{CAPTCHA_TRIES}): Đang giải mã...")
         text = re.sub(r'[^A-Za-z0-9]', '', _ocr.classification(png) or '').upper()
-        
-        # CHỐT CHẶT: KHÔNG PHẢI 4 KÝ TỰ THÌ KHÔNG GỬI, BỎ QUA NGAY!
-        if len(text) != 4:
-            print(f"   [!] Mã OCR sai định dạng ({text} - {len(text)} ký tự). Bỏ qua, thử lại...")
+
+        # Captcha Apple maxLength=12, thuc te 4-8 ky tu -> chap nhan dai linh hoat (KHONG khoa cung 4)
+        if not (4 <= len(text) <= 8):
+            print(f"   [!] Mã OCR sai định dạng ({text} - {len(text)} ký tự, cần 4-8). Làm mới ảnh, thử lại...")
+            find_refresh_captcha(driver) and time.sleep(1.8)
             attempt += 1
-            time.sleep(2.0)
-            continue 
-            
-        print(f"   -> Mã gửi đi: {text}")
+            time.sleep(1.5)
+            continue
+
+        print(f"   -> Mã gửi đi: {text} ({len(text)} ký tự)")
         
         time.sleep(random.uniform(1.0, 1.8)) 
         smooth_type(driver, cin, text) 
@@ -357,16 +367,17 @@ def solve_captcha_loop(driver, serial):
         if status == "success": return True 
         if status == "BANNED": return "BANNED"
         
-        print("   [!] Mã sai. Đang xóa trắng ô nhập và chờ Apple load ảnh mới...")
+        print("   [!] Mã sai. Xóa ô nhập + bấm nút làm mới captcha lấy ảnh mới...")
         attempt += 1
-        
+
         try:
             cin.click()
             cin.send_keys(Keys.CONTROL + "a")
             cin.send_keys(Keys.BACKSPACE)
         except: pass
 
-        time.sleep(3.5)
+        find_refresh_captcha(driver)   # bam captcha-refresh-btn -> anh moi
+        time.sleep(3.0)
         
         s_box = find_serial_input(driver, timeout=2)
         if s_box:
@@ -424,7 +435,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v4.2 - Chốt Cứng 4 Ký Tự OCR")
+    print("Apple Checker v4.3 - Sua nut GUI + captcha linh hoat")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
