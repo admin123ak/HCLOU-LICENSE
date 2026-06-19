@@ -49,10 +49,10 @@ def _build_proxy_url():
         return u
     return ""
 
-BATCH_PER_IP = 6          
-DELAY_MIN, DELAY_MAX = 5, 9   
+BATCH_PER_IP = 3          # Ít serial/IP -> đổi IP thường xuyên -> ÍT BAN hơn
+DELAY_MIN, DELAY_MAX = 5, 9
 
-CAPTCHA_TRIES = 8 # Tăng số lần thử lên để bù cho việc bỏ qua mã sai
+CAPTCHA_TRIES = 5 # Mỗi lần sai = 1 request. Ít lần -> ít request -> ít ban. Sai 5 lần thì RETRY đổi IP
 
 def set_anti_sleep(status=True):
     try:
@@ -410,8 +410,12 @@ def handle(driver, serial, i, total):
         time.sleep(3.0) 
         
         passed = solve_captcha_loop(driver, serial) if AUTO_CAPTCHA else None
-        if passed in ("TIMEOUT", "BANNED"): return Result(serial, passed, "", "", "")
-            
+        # Bat MOI ket qua loi cua captcha -> tra ve de main DOI IP + thu lai (khong ghi Unknown lung tung)
+        if passed in ("TIMEOUT", "BANNED", "ERROR"): return Result(serial, passed, "", "", "")
+        if passed is False:   # OCR sai het cac lan -> doi IP thu lai (captcha moi)
+            print("   [!] Captcha chưa qua sau nhiều lần -> RETRY (đổi IP)")
+            return Result(serial, "RETRY", "", "", "")
+
         time.sleep(3.0) 
         body = driver.find_element(By.TAG_NAME, "body").text.lower()
         
