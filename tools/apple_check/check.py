@@ -443,37 +443,33 @@ def solve_captcha_loop(driver, serial):
         print("   [!] Không load được captcha"); return "ERROR"
 
     cin = find_captcha_input(driver)
-    if cin:
-        try:
-            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
-            time.sleep(0.3)
-        except: pass
+    if not cin: print("   [!] Không thấy ô captcha"); return "ERROR"
+    try:
+        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", img)
+        time.sleep(0.3)
+    except: pass
 
-    reads = 0
-    while reads < CAPTCHA_TRIES:
+    # Doc captcha. Neu doc ra RAC (sai dinh dang) -> refresh DUNG 1 LAN (khong spam load).
+    text, strong = read_captcha_text(driver, img)
+    print(f"   captcha OCR: {text} {'[2 model khớp]' if strong else ''}")
+    if not (4 <= len(text) <= 8):
+        print("   [!] Đọc ra rác -> load mã mới (1 lần)")
+        img, sig = refresh_and_wait(driver, sig)
         if looks_banned(driver): return "BANNED"
         cin = find_captcha_input(driver)
-        if img is None or not cin:
-            print("   [!] Mất ô/ảnh captcha -> đổi IP"); return False
+        if img is None or not cin: return False
+        text, strong = read_captcha_text(driver, img)
+        print(f"   captcha OCR (lần 2): {text}")
+        if not (4 <= len(text) <= 8):
+            print("   [!] Vẫn khó đọc -> đổi IP"); return False
 
-        text, strong = read_captcha_text(driver, img)   # strong = 2 model khớp
-        print(f"   captcha OCR (đọc {reads+1}/{CAPTCHA_TRIES}): {text} {'[CHẮC]' if strong else '[chưa chắc]'}")
-
-        # CHUA CHAC -> chỉ LOAD MÃ MỚI (bấm refresh captcha), KHÔNG load lại trang, KHÔNG gửi
-        if not (4 <= len(text) <= 8) or not strong:
-            print("   [!] Chưa chắc -> load mã captcha mới (refresh, KHÔNG load lại trang)")
-            img, sig = refresh_and_wait(driver, sig)
-            reads += 1; continue
-
-        # CHAC -> GUI DUY NHAT 1 LAN tren IP nay
-        type_captcha(driver, cin, text)
-        print(f"   -> Gửi mã: {text}")
-        status = submit_and_check(driver, cin, timeout=10)
-        if status == "success": return True
-        if status == "BANNED": return "BANNED"
-        print("   [!] Mã sai -> ĐỔI IP (IP này coi như đã cháy)")
-        return False
-
+    # GUI 1 LAN tren IP nay (du strong hay khong - vi refresh nhieu cung bi ban).
+    type_captcha(driver, cin, text)
+    print(f"   -> Gửi mã: {text}")
+    status = submit_and_check(driver, cin, timeout=10)
+    if status == "success": return True
+    if status == "BANNED": return "BANNED"
+    print("   [!] Mã sai -> ĐỔI IP (IP này coi như đã cháy)")
     return False
 
 def handle(driver, serial, i, total):
@@ -526,7 +522,7 @@ def handle(driver, serial, i, total):
     except: return Result(serial, "ERROR", "", "", "")
 
 def main():
-    print("Apple Checker v5.4 - 1 IP/serial; chua chac thi LOAD MA captcha moi (refresh), KHONG load lai trang")
+    print("Apple Checker v5.5 - Doc 1 lan + GUI luon (toi da 1 refresh neu rac). Het spam load")
     master_serials = read_serials(INPUT_FILE)
     if not master_serials: return
     
